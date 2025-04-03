@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+
+import "upload.proto";
+import "user.proto";
+import "api_key.proto";
+import "response.proto";
+
+option go_package = "internal/pb;pb";
+
+
+service NeuroStash {
+
+    rpc UploadFiles (UploadRequest) returns (UploadResponse){
+        option (google.api.http) = {
+            post: "/v1/upload/request"
+            body: "*"
+        };
+    };
+
+    rpc ConfirmUploadStatus (UploadStatusRequest) returns (Response){
+        option (google.api.http) = {
+            post: "/v1/upload/status-update"
+            body: "*"
+        };
+    };
+
+    rpc Sync (google.protobuf.Empty) returns (Response) {
+        option (google.api.http) = {
+            get: "/v1/sync"
+        };
+    };
+
+    rpc CreateUser (CreateUserRequest) returns (ApiKeyResponse){
+        option (google.api.http) = {
+            post: "/v1/user/register"
+            body: "*"
+        };
+    };
+
+    rpc CreateApiKey (google.protobuf.Empty) returns (ApiKeyResponse) {
+        option (google.api.http) = {
+            post: "/v1/user/api-key/create"
+            body: "*"
+        };
+    };
+
+    rpc ListApiKeys (google.protobuf.Empty) returns (ListApiKeyResponse) {
+        option (google.api.http) = {
+            get: "/v1/user/api-key/list"
+        };
+    };
+
+    rpc DeleteApiKey (DeleteApiKeyRequest) returns (Response) {
+        option (google.api.http) = {
+            post: "/v1/user/api-key/delete"
+            body: "*"
+        };
+    };
+}
+

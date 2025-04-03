@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "internal/pb;pb";
+
+message ApiKeyResponse {
+    string api_key = 1;
+}
+
+message ListApiKeyResponse {
+    repeated string api_keys = 1;
+}
+
+message DeleteApiKeyRequest {
+    string api_key = 1;
+}
