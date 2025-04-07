@@ -9,6 +9,7 @@ import "upload.proto";
 import "user.proto";
 import "api_key.proto";
 import "response.proto";
+import "ingest.proto";
 
 option go_package = "internal/pb;pb";
 
@@ -25,6 +26,13 @@ service NeuroStash {
     rpc ConfirmUploadStatus (UploadStatusRequest) returns (Response){
         option (google.api.http) = {
             post: "/v1/upload/status-update"
+            body: "*"
+        };
+    };
+
+    rpc IngestData(IngestDataRequest) returns (Response){
+        option (google.api.http) = {
+            post: "/v1/ingest"
             body: "*"
         };
     };

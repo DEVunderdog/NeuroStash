@@ -82,6 +82,36 @@ func (q *Queries) DeleteFiles(ctx context.Context, arg DeleteFilesParams) (pgcon
 	return q.db.Exec(ctx, deleteFiles, arg.Ids, arg.CurrentLockStatus, arg.UpdatedAt)
 }
 
+const getFilesObjectKeys = `-- name: GetFilesObjectKeys :many
+select object_key from documents_registry 
+    where user_id = $1 and file_name = any($2::string[])
+`
+
+type GetFilesObjectKeysParams struct {
+	UserID    int32    `json:"user_id"`
+	Filenames []string `json:"filenames"`
+}
+
+func (q *Queries) GetFilesObjectKeys(ctx context.Context, arg GetFilesObjectKeysParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, getFilesObjectKeys, arg.UserID, arg.Filenames)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listConflictingFiles = `-- name: ListConflictingFiles :many
 select id, file_name, object_key from documents_registry
 where ((lock_status = $1 AND op_status = $2) OR

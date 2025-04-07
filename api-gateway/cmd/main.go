@@ -13,6 +13,7 @@ import (
 	database "github.com/DEVunderdog/neurostash/internal/database/sqlc"
 	"github.com/DEVunderdog/neurostash/internal/logger"
 	"github.com/DEVunderdog/neurostash/internal/pb"
+	"github.com/DEVunderdog/neurostash/internal/queue"
 	"github.com/DEVunderdog/neurostash/internal/server"
 	"github.com/DEVunderdog/neurostash/internal/token"
 	"github.com/DEVunderdog/neurostash/internal/utils"
@@ -96,14 +97,28 @@ func main() {
 		log.Fatal().Err(err).Msg("error creating aws client")
 	}
 
+	queueClient := queue.NewQueueClient(config.QueueName, config.RabbitMqServerAddr)
+
 	waitGroup, ctx := errgroup.WithContext(notifyContext)
 
-	runGrpcServer(ctx, waitGroup, *config, store, tokenMaker, awsClient)
-	runGatewayServer(ctx, waitGroup, *config, store, tokenMaker, awsClient)
+	runGrpcServer(ctx, waitGroup, *config, store, tokenMaker, awsClient, queueClient)
+	runGatewayServer(ctx, waitGroup, *config, store, tokenMaker, awsClient, queueClient)
 
 	err = waitGroup.Wait()
 	if err != nil {
-		log.Fatal().Err(err).Msg("error from wait group")
+		log.Error().Err(err).Msg("error from server group during execution")
+	}
+	
+
+	log.Info().Msg("shutting down queue client...")
+	if closeErr := queueClient.Close(); closeErr != nil {
+		log.Error().Err(closeErr).Msg("error closing queue client")
+	} else {
+		log.Info().Msg("queue client shutdown")
+	}
+
+	if err != nil {
+		os.Exit(1)
 	}
 }
 
@@ -114,8 +129,9 @@ func runGrpcServer(
 	store database.Store,
 	tokenMaker *token.TokenMaker,
 	awsClient *aws.AwsClients,
+	queueClient *queue.QueueClient,
 ) {
-	server, err := server.NewServer(ctx, store, config, tokenMaker, awsClient)
+	server, err := server.NewServer(ctx, store, config, tokenMaker, awsClient, queueClient)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create server")
 	}
@@ -163,8 +179,9 @@ func runGatewayServer(
 	store database.Store,
 	tokenMaker *token.TokenMaker,
 	awsClient *aws.AwsClients,
+	queueClient *queue.QueueClient,
 ) {
-	server, err := server.NewServer(ctx, store, config, tokenMaker, awsClient)
+	server, err := server.NewServer(ctx, store, config, tokenMaker, awsClient, queueClient)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create server")
 	}

@@ -20,6 +20,7 @@ type Querier interface {
 	DeleteFiles(ctx context.Context, arg DeleteFilesParams) (pgconn.CommandTag, error)
 	GetActiveKey(ctx context.Context) (GetActiveKeyRow, error)
 	GetApiKeyPayload(ctx context.Context, credential []byte) (GetApiKeyPayloadRow, error)
+	GetFilesObjectKeys(ctx context.Context, arg GetFilesObjectKeysParams) ([]string, error)
 	ListApiKeys(ctx context.Context, userID int32) ([][]byte, error)
 	ListConflictingFiles(ctx context.Context, arg ListConflictingFilesParams) ([]ListConflictingFilesRow, error)
 	RegisterUser(ctx context.Context, email string) (UserClient, error)

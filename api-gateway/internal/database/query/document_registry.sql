@@ -22,6 +22,10 @@ where ((lock_status = sqlc.arg(first_lock_condition) AND op_status = sqlc.arg(fi
     AND
     user_id = sqlc.arg(user_id);
 
+-- name: GetFilesObjectKeys :many
+select object_key from documents_registry 
+    where user_id = sqlc.arg(user_id) and file_name = any(@filenames::string[]);
+
 -- name: UpdateDocumentUploadStatus :execresult
 update documents_registry
 set

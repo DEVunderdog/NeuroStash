@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	NeuroStash_UploadFiles_FullMethodName         = "/pb.NeuroStash/UploadFiles"
 	NeuroStash_ConfirmUploadStatus_FullMethodName = "/pb.NeuroStash/ConfirmUploadStatus"
+	NeuroStash_IngestData_FullMethodName          = "/pb.NeuroStash/IngestData"
 	NeuroStash_Sync_FullMethodName                = "/pb.NeuroStash/Sync"
 	NeuroStash_CreateUser_FullMethodName          = "/pb.NeuroStash/CreateUser"
 	NeuroStash_CreateApiKey_FullMethodName        = "/pb.NeuroStash/CreateApiKey"
@@ -35,6 +36,7 @@ const (
 type NeuroStashClient interface {
 	UploadFiles(ctx context.Context, in *UploadRequest, opts ...grpc.CallOption) (*UploadResponse, error)
 	ConfirmUploadStatus(ctx context.Context, in *UploadStatusRequest, opts ...grpc.CallOption) (*Response, error)
+	IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*Response, error)
 	Sync(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Response, error)
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*ApiKeyResponse, error)
 	CreateApiKey(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ApiKeyResponse, error)
@@ -64,6 +66,16 @@ func (c *neuroStashClient) ConfirmUploadStatus(ctx context.Context, in *UploadSt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Response)
 	err := c.cc.Invoke(ctx, NeuroStash_ConfirmUploadStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *neuroStashClient) IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Response)
+	err := c.cc.Invoke(ctx, NeuroStash_IngestData_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +138,7 @@ func (c *neuroStashClient) DeleteApiKey(ctx context.Context, in *DeleteApiKeyReq
 type NeuroStashServer interface {
 	UploadFiles(context.Context, *UploadRequest) (*UploadResponse, error)
 	ConfirmUploadStatus(context.Context, *UploadStatusRequest) (*Response, error)
+	IngestData(context.Context, *IngestDataRequest) (*Response, error)
 	Sync(context.Context, *emptypb.Empty) (*Response, error)
 	CreateUser(context.Context, *CreateUserRequest) (*ApiKeyResponse, error)
 	CreateApiKey(context.Context, *emptypb.Empty) (*ApiKeyResponse, error)
@@ -146,6 +159,9 @@ func (UnimplementedNeuroStashServer) UploadFiles(context.Context, *UploadRequest
 }
 func (UnimplementedNeuroStashServer) ConfirmUploadStatus(context.Context, *UploadStatusRequest) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConfirmUploadStatus not implemented")
+}
+func (UnimplementedNeuroStashServer) IngestData(context.Context, *IngestDataRequest) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IngestData not implemented")
 }
 func (UnimplementedNeuroStashServer) Sync(context.Context, *emptypb.Empty) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Sync not implemented")
@@ -215,6 +231,24 @@ func _NeuroStash_ConfirmUploadStatus_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NeuroStashServer).ConfirmUploadStatus(ctx, req.(*UploadStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NeuroStash_IngestData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IngestDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NeuroStashServer).IngestData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NeuroStash_IngestData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NeuroStashServer).IngestData(ctx, req.(*IngestDataRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -323,6 +357,10 @@ var NeuroStash_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConfirmUploadStatus",
 			Handler:    _NeuroStash_ConfirmUploadStatus_Handler,
+		},
+		{
+			MethodName: "IngestData",
+			Handler:    _NeuroStash_IngestData_Handler,
 		},
 		{
 			MethodName: "Sync",
