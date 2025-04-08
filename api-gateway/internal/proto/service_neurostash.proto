@@ -10,6 +10,7 @@ import "user.proto";
 import "api_key.proto";
 import "response.proto";
 import "ingest.proto";
+import "knowledge_base.proto";
 
 option go_package = "internal/pb;pb";
 
@@ -30,9 +31,29 @@ service NeuroStash {
         };
     };
 
+    rpc CreateKnowledgeBase (CreateKnowledgeBaseRequest) returns (Response){
+        option (google.api.http) = {
+            post: "/v1/knowledge-base/create"
+            body: "*"
+        };
+    };
+
+    rpc ListKnowledgeBase (google.protobuf.Empty) returns (KnowledgeBaseResponse){
+        option (google.api.http) = {
+            get: "/v1/knowledge-base/list"
+        };
+    };
+
     rpc IngestData(IngestDataRequest) returns (Response){
         option (google.api.http) = {
-            post: "/v1/ingest"
+            post: "/v1/knowledge-base/ingest"
+            body: "*"
+        };
+    };
+
+    rpc IngestDataStatus(IngestDataStatusRequest) returns (IngestDataStatusResponse){
+        option (google.api.http) = {
+            post: "/v1/knowledge-base/ingest/status"
             body: "*"
         };
     };

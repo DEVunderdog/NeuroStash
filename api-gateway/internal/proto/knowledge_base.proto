@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "internal/pb;pb";
+
+message CreateKnowledgeBaseRequest {
+    string name = 1;
+}
+
+message KnowledgeBase {
+    int32 knowledge_base_id = 1;
+    string knowledge_base_name = 2;
+}
+
+message KnowledgeBaseResponse {
+    repeated KnowledgeBase knowledge_bases = 1;
+}

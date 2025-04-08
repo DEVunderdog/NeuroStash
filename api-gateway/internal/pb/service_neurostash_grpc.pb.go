@@ -22,7 +22,10 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	NeuroStash_UploadFiles_FullMethodName         = "/pb.NeuroStash/UploadFiles"
 	NeuroStash_ConfirmUploadStatus_FullMethodName = "/pb.NeuroStash/ConfirmUploadStatus"
+	NeuroStash_CreateKnowledgeBase_FullMethodName = "/pb.NeuroStash/CreateKnowledgeBase"
+	NeuroStash_ListKnowledgeBase_FullMethodName   = "/pb.NeuroStash/ListKnowledgeBase"
 	NeuroStash_IngestData_FullMethodName          = "/pb.NeuroStash/IngestData"
+	NeuroStash_IngestDataStatus_FullMethodName    = "/pb.NeuroStash/IngestDataStatus"
 	NeuroStash_Sync_FullMethodName                = "/pb.NeuroStash/Sync"
 	NeuroStash_CreateUser_FullMethodName          = "/pb.NeuroStash/CreateUser"
 	NeuroStash_CreateApiKey_FullMethodName        = "/pb.NeuroStash/CreateApiKey"
@@ -36,7 +39,10 @@ const (
 type NeuroStashClient interface {
 	UploadFiles(ctx context.Context, in *UploadRequest, opts ...grpc.CallOption) (*UploadResponse, error)
 	ConfirmUploadStatus(ctx context.Context, in *UploadStatusRequest, opts ...grpc.CallOption) (*Response, error)
+	CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*Response, error)
+	ListKnowledgeBase(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*KnowledgeBaseResponse, error)
 	IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*Response, error)
+	IngestDataStatus(ctx context.Context, in *IngestDataStatusRequest, opts ...grpc.CallOption) (*IngestDataStatusResponse, error)
 	Sync(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Response, error)
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*ApiKeyResponse, error)
 	CreateApiKey(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ApiKeyResponse, error)
@@ -72,10 +78,40 @@ func (c *neuroStashClient) ConfirmUploadStatus(ctx context.Context, in *UploadSt
 	return out, nil
 }
 
+func (c *neuroStashClient) CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Response)
+	err := c.cc.Invoke(ctx, NeuroStash_CreateKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *neuroStashClient) ListKnowledgeBase(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*KnowledgeBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(KnowledgeBaseResponse)
+	err := c.cc.Invoke(ctx, NeuroStash_ListKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *neuroStashClient) IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*Response, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Response)
 	err := c.cc.Invoke(ctx, NeuroStash_IngestData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *neuroStashClient) IngestDataStatus(ctx context.Context, in *IngestDataStatusRequest, opts ...grpc.CallOption) (*IngestDataStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IngestDataStatusResponse)
+	err := c.cc.Invoke(ctx, NeuroStash_IngestDataStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +174,10 @@ func (c *neuroStashClient) DeleteApiKey(ctx context.Context, in *DeleteApiKeyReq
 type NeuroStashServer interface {
 	UploadFiles(context.Context, *UploadRequest) (*UploadResponse, error)
 	ConfirmUploadStatus(context.Context, *UploadStatusRequest) (*Response, error)
+	CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*Response, error)
+	ListKnowledgeBase(context.Context, *emptypb.Empty) (*KnowledgeBaseResponse, error)
 	IngestData(context.Context, *IngestDataRequest) (*Response, error)
+	IngestDataStatus(context.Context, *IngestDataStatusRequest) (*IngestDataStatusResponse, error)
 	Sync(context.Context, *emptypb.Empty) (*Response, error)
 	CreateUser(context.Context, *CreateUserRequest) (*ApiKeyResponse, error)
 	CreateApiKey(context.Context, *emptypb.Empty) (*ApiKeyResponse, error)
@@ -160,8 +199,17 @@ func (UnimplementedNeuroStashServer) UploadFiles(context.Context, *UploadRequest
 func (UnimplementedNeuroStashServer) ConfirmUploadStatus(context.Context, *UploadStatusRequest) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConfirmUploadStatus not implemented")
 }
+func (UnimplementedNeuroStashServer) CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateKnowledgeBase not implemented")
+}
+func (UnimplementedNeuroStashServer) ListKnowledgeBase(context.Context, *emptypb.Empty) (*KnowledgeBaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListKnowledgeBase not implemented")
+}
 func (UnimplementedNeuroStashServer) IngestData(context.Context, *IngestDataRequest) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IngestData not implemented")
+}
+func (UnimplementedNeuroStashServer) IngestDataStatus(context.Context, *IngestDataStatusRequest) (*IngestDataStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IngestDataStatus not implemented")
 }
 func (UnimplementedNeuroStashServer) Sync(context.Context, *emptypb.Empty) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Sync not implemented")
@@ -235,6 +283,42 @@ func _NeuroStash_ConfirmUploadStatus_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NeuroStash_CreateKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NeuroStashServer).CreateKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NeuroStash_CreateKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NeuroStashServer).CreateKnowledgeBase(ctx, req.(*CreateKnowledgeBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NeuroStash_ListKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NeuroStashServer).ListKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NeuroStash_ListKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NeuroStashServer).ListKnowledgeBase(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _NeuroStash_IngestData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IngestDataRequest)
 	if err := dec(in); err != nil {
@@ -249,6 +333,24 @@ func _NeuroStash_IngestData_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NeuroStashServer).IngestData(ctx, req.(*IngestDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NeuroStash_IngestDataStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IngestDataStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NeuroStashServer).IngestDataStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NeuroStash_IngestDataStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NeuroStashServer).IngestDataStatus(ctx, req.(*IngestDataStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -359,8 +461,20 @@ var NeuroStash_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _NeuroStash_ConfirmUploadStatus_Handler,
 		},
 		{
+			MethodName: "CreateKnowledgeBase",
+			Handler:    _NeuroStash_CreateKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "ListKnowledgeBase",
+			Handler:    _NeuroStash_ListKnowledgeBase_Handler,
+		},
+		{
 			MethodName: "IngestData",
 			Handler:    _NeuroStash_IngestData_Handler,
+		},
+		{
+			MethodName: "IngestDataStatus",
+			Handler:    _NeuroStash_IngestDataStatus_Handler,
 		},
 		{
 			MethodName: "Sync",

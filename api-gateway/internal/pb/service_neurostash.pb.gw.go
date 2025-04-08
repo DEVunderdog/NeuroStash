@@ -84,6 +84,49 @@ func local_request_NeuroStash_ConfirmUploadStatus_0(ctx context.Context, marshal
 	return msg, metadata, err
 }
 
+func request_NeuroStash_CreateKnowledgeBase_0(ctx context.Context, marshaler runtime.Marshaler, client NeuroStashClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq CreateKnowledgeBaseRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.CreateKnowledgeBase(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_NeuroStash_CreateKnowledgeBase_0(ctx context.Context, marshaler runtime.Marshaler, server NeuroStashServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq CreateKnowledgeBaseRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.CreateKnowledgeBase(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_NeuroStash_ListKnowledgeBase_0(ctx context.Context, marshaler runtime.Marshaler, client NeuroStashClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
+	io.Copy(io.Discard, req.Body)
+	msg, err := client.ListKnowledgeBase(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_NeuroStash_ListKnowledgeBase_0(ctx context.Context, marshaler runtime.Marshaler, server NeuroStashServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
+	msg, err := server.ListKnowledgeBase(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_NeuroStash_IngestData_0(ctx context.Context, marshaler runtime.Marshaler, client NeuroStashClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq IngestDataRequest
@@ -105,6 +148,30 @@ func local_request_NeuroStash_IngestData_0(ctx context.Context, marshaler runtim
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.IngestData(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_NeuroStash_IngestDataStatus_0(ctx context.Context, marshaler runtime.Marshaler, client NeuroStashClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq IngestDataStatusRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.IngestDataStatus(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_NeuroStash_IngestDataStatus_0(ctx context.Context, marshaler runtime.Marshaler, server NeuroStashServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq IngestDataStatusRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.IngestDataStatus(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -264,13 +331,53 @@ func RegisterNeuroStashHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_NeuroStash_ConfirmUploadStatus_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_NeuroStash_CreateKnowledgeBase_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pb.NeuroStash/CreateKnowledgeBase", runtime.WithHTTPPathPattern("/v1/knowledge-base/create"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_NeuroStash_CreateKnowledgeBase_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_NeuroStash_CreateKnowledgeBase_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_NeuroStash_ListKnowledgeBase_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pb.NeuroStash/ListKnowledgeBase", runtime.WithHTTPPathPattern("/v1/knowledge-base/list"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_NeuroStash_ListKnowledgeBase_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_NeuroStash_ListKnowledgeBase_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_NeuroStash_IngestData_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pb.NeuroStash/IngestData", runtime.WithHTTPPathPattern("/v1/ingest"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pb.NeuroStash/IngestData", runtime.WithHTTPPathPattern("/v1/knowledge-base/ingest"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -283,6 +390,26 @@ func RegisterNeuroStashHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 			return
 		}
 		forward_NeuroStash_IngestData_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPost, pattern_NeuroStash_IngestDataStatus_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pb.NeuroStash/IngestDataStatus", runtime.WithHTTPPathPattern("/v1/knowledge-base/ingest/status"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_NeuroStash_IngestDataStatus_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_NeuroStash_IngestDataStatus_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodGet, pattern_NeuroStash_Sync_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -458,11 +585,45 @@ func RegisterNeuroStashHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_NeuroStash_ConfirmUploadStatus_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_NeuroStash_CreateKnowledgeBase_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pb.NeuroStash/CreateKnowledgeBase", runtime.WithHTTPPathPattern("/v1/knowledge-base/create"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_NeuroStash_CreateKnowledgeBase_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_NeuroStash_CreateKnowledgeBase_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_NeuroStash_ListKnowledgeBase_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pb.NeuroStash/ListKnowledgeBase", runtime.WithHTTPPathPattern("/v1/knowledge-base/list"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_NeuroStash_ListKnowledgeBase_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_NeuroStash_ListKnowledgeBase_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_NeuroStash_IngestData_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pb.NeuroStash/IngestData", runtime.WithHTTPPathPattern("/v1/ingest"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pb.NeuroStash/IngestData", runtime.WithHTTPPathPattern("/v1/knowledge-base/ingest"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -474,6 +635,23 @@ func RegisterNeuroStashHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 			return
 		}
 		forward_NeuroStash_IngestData_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPost, pattern_NeuroStash_IngestDataStatus_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pb.NeuroStash/IngestDataStatus", runtime.WithHTTPPathPattern("/v1/knowledge-base/ingest/status"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_NeuroStash_IngestDataStatus_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_NeuroStash_IngestDataStatus_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodGet, pattern_NeuroStash_Sync_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -566,7 +744,10 @@ func RegisterNeuroStashHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 var (
 	pattern_NeuroStash_UploadFiles_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "upload", "request"}, ""))
 	pattern_NeuroStash_ConfirmUploadStatus_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "upload", "status-update"}, ""))
-	pattern_NeuroStash_IngestData_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "ingest"}, ""))
+	pattern_NeuroStash_CreateKnowledgeBase_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "knowledge-base", "create"}, ""))
+	pattern_NeuroStash_ListKnowledgeBase_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "knowledge-base", "list"}, ""))
+	pattern_NeuroStash_IngestData_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "knowledge-base", "ingest"}, ""))
+	pattern_NeuroStash_IngestDataStatus_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "knowledge-base", "ingest", "status"}, ""))
 	pattern_NeuroStash_Sync_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "sync"}, ""))
 	pattern_NeuroStash_CreateUser_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "user", "register"}, ""))
 	pattern_NeuroStash_CreateApiKey_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "user", "api-key", "create"}, ""))
@@ -577,7 +758,10 @@ var (
 var (
 	forward_NeuroStash_UploadFiles_0         = runtime.ForwardResponseMessage
 	forward_NeuroStash_ConfirmUploadStatus_0 = runtime.ForwardResponseMessage
+	forward_NeuroStash_CreateKnowledgeBase_0 = runtime.ForwardResponseMessage
+	forward_NeuroStash_ListKnowledgeBase_0   = runtime.ForwardResponseMessage
 	forward_NeuroStash_IngestData_0          = runtime.ForwardResponseMessage
+	forward_NeuroStash_IngestDataStatus_0    = runtime.ForwardResponseMessage
 	forward_NeuroStash_Sync_0                = runtime.ForwardResponseMessage
 	forward_NeuroStash_CreateUser_0          = runtime.ForwardResponseMessage
 	forward_NeuroStash_CreateApiKey_0        = runtime.ForwardResponseMessage
