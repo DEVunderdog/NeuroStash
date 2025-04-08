@@ -15,9 +15,13 @@ type Querier interface {
 	CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error)
 	CreateEmptyDocuments(ctx context.Context, arg CreateEmptyDocumentsParams) ([]CreateEmptyDocumentsRow, error)
 	CreateEncryptionKeys(ctx context.Context, arg CreateEncryptionKeysParams) (EncryptionKey, error)
+	CreateIngestionJob(ctx context.Context, arg CreateIngestionJobParams) (IngestionJob, error)
+	CreateKnowledgeBase(ctx context.Context, arg CreateKnowledgeBaseParams) (KnowledgeBasis, error)
+	CreateKnowledgeBaseDocuments(ctx context.Context, arg CreateKnowledgeBaseDocumentsParams) (KnowledgeBaseDocument, error)
 	DeleteApiKey(ctx context.Context, arg DeleteApiKeyParams) (pgconn.CommandTag, error)
 	DeleteEncryptionKey(ctx context.Context, id int32) (pgconn.CommandTag, error)
 	DeleteFiles(ctx context.Context, arg DeleteFilesParams) (pgconn.CommandTag, error)
+	DeleteKnowledgeBase(ctx context.Context, knowledgeBaseName string) error
 	GetActiveKey(ctx context.Context) (GetActiveKeyRow, error)
 	GetApiKeyPayload(ctx context.Context, credential []byte) (GetApiKeyPayloadRow, error)
 	GetFilesObjectKeys(ctx context.Context, arg GetFilesObjectKeysParams) ([]string, error)
@@ -27,6 +31,7 @@ type Querier interface {
 	SyncDelete(ctx context.Context, ids []int32) (pgconn.CommandTag, error)
 	SyncUpdateDocument(ctx context.Context, arg SyncUpdateDocumentParams) (pgconn.CommandTag, error)
 	UpdateDocumentUploadStatus(ctx context.Context, arg UpdateDocumentUploadStatusParams) (pgconn.CommandTag, error)
+	UpdateIngestionJobStatus(ctx context.Context, arg UpdateIngestionJobStatusParams) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -83,6 +83,31 @@ type EncryptionKey struct {
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
+type IngestionJob struct {
+	ID         int32              `json:"id"`
+	ResourceID pgtype.UUID        `json:"resource_id"`
+	OpStatus   OperationStatus    `json:"op_status"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
+type KnowledgeBaseDocument struct {
+	ID              int32              `json:"id"`
+	IngestionID     int32              `json:"ingestion_id"`
+	KnowledgeBaseID int32              `json:"knowledge_base_id"`
+	DocumentID      int32              `json:"document_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type KnowledgeBasis struct {
+	ID        int32              `json:"id"`
+	UserID    int32              `json:"user_id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type UserClient struct {
 	ID        int32              `json:"id"`
 	Email     string             `json:"email"`
