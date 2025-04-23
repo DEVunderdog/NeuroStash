@@ -3,3 +3,5 @@ rough.txt
 Makefile
 venv
 api-gateway-server
+__pycache__/
+*.py[cod]
