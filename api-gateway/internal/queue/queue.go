@@ -161,4 +161,3 @@ func (client *QueueClient) handleReInit(conn *amqp.Connection) bool {
 		}
 	}
 }
-

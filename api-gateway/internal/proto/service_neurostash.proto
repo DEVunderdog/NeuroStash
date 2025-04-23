@@ -31,7 +31,7 @@ service NeuroStash {
         };
     };
 
-    rpc CreateKnowledgeBase (CreateKnowledgeBaseRequest) returns (Response){
+    rpc CreateKnowledgeBase (CreateKnowledgeBaseRequest) returns (KnowledgeBase){
         option (google.api.http) = {
             post: "/v1/knowledge-base/create"
             body: "*"
@@ -44,7 +44,13 @@ service NeuroStash {
         };
     };
 
-    rpc IngestData(IngestDataRequest) returns (Response){
+    rpc DeleteKnowledgeBase (DeleteKnowledgeBaseRequest) returns (Response) {
+        option (google.api.http) = {
+            delete: "/v1/knowledge-base/delete/{knowledge_base_id}"
+        };
+    };
+
+    rpc IngestData(IngestDataRequest) returns (IngestDataResponse){
         option (google.api.http) = {
             post: "/v1/knowledge-base/ingest"
             body: "*"

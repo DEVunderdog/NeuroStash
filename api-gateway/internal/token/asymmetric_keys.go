@@ -134,7 +134,7 @@ func encodePublicKey(publicKey *rsa.PublicKey) ([]byte, error) {
 	return pubBytes, err
 }
 
-func decodePublicKey(key[]byte) (*rsa.PublicKey, error) {
+func decodePublicKey(key []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(key)
 
 	if block == nil {

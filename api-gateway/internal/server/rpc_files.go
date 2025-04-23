@@ -42,7 +42,7 @@ func (server *Server) UploadFiles(ctx context.Context, req *pb.UploadRequest) (*
 	for _, item := range files {
 		var err error
 		unq_id := uuid.New().String()
-		
+
 		cleanedPrefix := strings.Trim(inclusionPrefix, "/")
 		objectKey := fmt.Sprintf("%s/%s/%s", cleanedPrefix, strconv.Itoa(int(authPayload.UserId)), unq_id)
 

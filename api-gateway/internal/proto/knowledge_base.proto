@@ -16,3 +16,7 @@ message KnowledgeBase {
 message KnowledgeBaseResponse {
     repeated KnowledgeBase knowledge_bases = 1;
 }
+
+message DeleteKnowledgeBaseRequest {
+    int32 knowledge_base_id = 1;
+}

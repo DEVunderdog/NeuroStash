@@ -42,7 +42,7 @@ func (server *Server) authorizeUser(ctx context.Context) (*token.Payload, error)
 
 	payload, err := server.store.GetApiKeyPayload(ctx, []byte(apiKey))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows){
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("provided api key doesn't exists")
 		}
 		return nil, fmt.Errorf("error getting api key payload")

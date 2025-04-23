@@ -24,6 +24,7 @@ const (
 	NeuroStash_ConfirmUploadStatus_FullMethodName = "/pb.NeuroStash/ConfirmUploadStatus"
 	NeuroStash_CreateKnowledgeBase_FullMethodName = "/pb.NeuroStash/CreateKnowledgeBase"
 	NeuroStash_ListKnowledgeBase_FullMethodName   = "/pb.NeuroStash/ListKnowledgeBase"
+	NeuroStash_DeleteKnowledgeBase_FullMethodName = "/pb.NeuroStash/DeleteKnowledgeBase"
 	NeuroStash_IngestData_FullMethodName          = "/pb.NeuroStash/IngestData"
 	NeuroStash_IngestDataStatus_FullMethodName    = "/pb.NeuroStash/IngestDataStatus"
 	NeuroStash_Sync_FullMethodName                = "/pb.NeuroStash/Sync"
@@ -39,9 +40,10 @@ const (
 type NeuroStashClient interface {
 	UploadFiles(ctx context.Context, in *UploadRequest, opts ...grpc.CallOption) (*UploadResponse, error)
 	ConfirmUploadStatus(ctx context.Context, in *UploadStatusRequest, opts ...grpc.CallOption) (*Response, error)
-	CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*Response, error)
+	CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*KnowledgeBase, error)
 	ListKnowledgeBase(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*KnowledgeBaseResponse, error)
-	IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*Response, error)
+	DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*Response, error)
+	IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*IngestDataResponse, error)
 	IngestDataStatus(ctx context.Context, in *IngestDataStatusRequest, opts ...grpc.CallOption) (*IngestDataStatusResponse, error)
 	Sync(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Response, error)
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*ApiKeyResponse, error)
@@ -78,9 +80,9 @@ func (c *neuroStashClient) ConfirmUploadStatus(ctx context.Context, in *UploadSt
 	return out, nil
 }
 
-func (c *neuroStashClient) CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*Response, error) {
+func (c *neuroStashClient) CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*KnowledgeBase, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Response)
+	out := new(KnowledgeBase)
 	err := c.cc.Invoke(ctx, NeuroStash_CreateKnowledgeBase_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -98,9 +100,19 @@ func (c *neuroStashClient) ListKnowledgeBase(ctx context.Context, in *emptypb.Em
 	return out, nil
 }
 
-func (c *neuroStashClient) IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*Response, error) {
+func (c *neuroStashClient) DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*Response, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Response)
+	err := c.cc.Invoke(ctx, NeuroStash_DeleteKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *neuroStashClient) IngestData(ctx context.Context, in *IngestDataRequest, opts ...grpc.CallOption) (*IngestDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IngestDataResponse)
 	err := c.cc.Invoke(ctx, NeuroStash_IngestData_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -174,9 +186,10 @@ func (c *neuroStashClient) DeleteApiKey(ctx context.Context, in *DeleteApiKeyReq
 type NeuroStashServer interface {
 	UploadFiles(context.Context, *UploadRequest) (*UploadResponse, error)
 	ConfirmUploadStatus(context.Context, *UploadStatusRequest) (*Response, error)
-	CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*Response, error)
+	CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*KnowledgeBase, error)
 	ListKnowledgeBase(context.Context, *emptypb.Empty) (*KnowledgeBaseResponse, error)
-	IngestData(context.Context, *IngestDataRequest) (*Response, error)
+	DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*Response, error)
+	IngestData(context.Context, *IngestDataRequest) (*IngestDataResponse, error)
 	IngestDataStatus(context.Context, *IngestDataStatusRequest) (*IngestDataStatusResponse, error)
 	Sync(context.Context, *emptypb.Empty) (*Response, error)
 	CreateUser(context.Context, *CreateUserRequest) (*ApiKeyResponse, error)
@@ -199,13 +212,16 @@ func (UnimplementedNeuroStashServer) UploadFiles(context.Context, *UploadRequest
 func (UnimplementedNeuroStashServer) ConfirmUploadStatus(context.Context, *UploadStatusRequest) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConfirmUploadStatus not implemented")
 }
-func (UnimplementedNeuroStashServer) CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*Response, error) {
+func (UnimplementedNeuroStashServer) CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*KnowledgeBase, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateKnowledgeBase not implemented")
 }
 func (UnimplementedNeuroStashServer) ListKnowledgeBase(context.Context, *emptypb.Empty) (*KnowledgeBaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListKnowledgeBase not implemented")
 }
-func (UnimplementedNeuroStashServer) IngestData(context.Context, *IngestDataRequest) (*Response, error) {
+func (UnimplementedNeuroStashServer) DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteKnowledgeBase not implemented")
+}
+func (UnimplementedNeuroStashServer) IngestData(context.Context, *IngestDataRequest) (*IngestDataResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IngestData not implemented")
 }
 func (UnimplementedNeuroStashServer) IngestDataStatus(context.Context, *IngestDataStatusRequest) (*IngestDataStatusResponse, error) {
@@ -315,6 +331,24 @@ func _NeuroStash_ListKnowledgeBase_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NeuroStashServer).ListKnowledgeBase(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NeuroStash_DeleteKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NeuroStashServer).DeleteKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NeuroStash_DeleteKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NeuroStashServer).DeleteKnowledgeBase(ctx, req.(*DeleteKnowledgeBaseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -467,6 +501,10 @@ var NeuroStash_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListKnowledgeBase",
 			Handler:    _NeuroStash_ListKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "DeleteKnowledgeBase",
+			Handler:    _NeuroStash_DeleteKnowledgeBase_Handler,
 		},
 		{
 			MethodName: "IngestData",

@@ -16,4 +16,5 @@ def setup_logger():
 
     return logger
 
+
 logger = setup_logger()

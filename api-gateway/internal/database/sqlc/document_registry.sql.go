@@ -82,29 +82,34 @@ func (q *Queries) DeleteFiles(ctx context.Context, arg DeleteFilesParams) (pgcon
 	return q.db.Exec(ctx, deleteFiles, arg.Ids, arg.CurrentLockStatus, arg.UpdatedAt)
 }
 
-const getFilesObjectKeys = `-- name: GetFilesObjectKeys :many
-select object_key from documents_registry 
+const getFilesObjectKeysWithID = `-- name: GetFilesObjectKeysWithID :many
+select id, object_key from documents_registry 
     where user_id = $1 and file_name = any($2::string[])
 `
 
-type GetFilesObjectKeysParams struct {
+type GetFilesObjectKeysWithIDParams struct {
 	UserID    int32    `json:"user_id"`
 	Filenames []string `json:"filenames"`
 }
 
-func (q *Queries) GetFilesObjectKeys(ctx context.Context, arg GetFilesObjectKeysParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, getFilesObjectKeys, arg.UserID, arg.Filenames)
+type GetFilesObjectKeysWithIDRow struct {
+	ID        int32  `json:"id"`
+	ObjectKey string `json:"object_key"`
+}
+
+func (q *Queries) GetFilesObjectKeysWithID(ctx context.Context, arg GetFilesObjectKeysWithIDParams) ([]GetFilesObjectKeysWithIDRow, error) {
+	rows, err := q.db.Query(ctx, getFilesObjectKeysWithID, arg.UserID, arg.Filenames)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []GetFilesObjectKeysWithIDRow{}
 	for rows.Next() {
-		var object_key string
-		if err := rows.Scan(&object_key); err != nil {
+		var i GetFilesObjectKeysWithIDRow
+		if err := rows.Scan(&i.ID, &i.ObjectKey); err != nil {
 			return nil, err
 		}
-		items = append(items, object_key)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

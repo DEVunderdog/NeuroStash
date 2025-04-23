@@ -39,7 +39,7 @@ func main() {
 	notifyContext, stop := signal.NotifyContext(context.Background(), interruptSignals...)
 	defer stop()
 
-	config, err := utils.LoadConfig("./app.env")
+	config, err := utils.LoadConfig("./app.yaml")
 	if err != nil {
 		log.Fatal().Err(err).Msg("error loading configuration")
 	}
@@ -108,7 +108,6 @@ func main() {
 	if err != nil {
 		log.Error().Err(err).Msg("error from server group during execution")
 	}
-	
 
 	log.Info().Msg("shutting down queue client...")
 	if closeErr := queueClient.Close(); closeErr != nil {

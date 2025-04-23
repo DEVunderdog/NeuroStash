@@ -38,10 +38,44 @@ func (q *Queries) CreateKnowledgeBase(ctx context.Context, arg CreateKnowledgeBa
 
 const deleteKnowledgeBase = `-- name: DeleteKnowledgeBase :exec
 delete from knowledge_bases
-where name = $1
+where id = $1 and user_id = $2
 `
 
-func (q *Queries) DeleteKnowledgeBase(ctx context.Context, knowledgeBaseName string) error {
-	_, err := q.db.Exec(ctx, deleteKnowledgeBase, knowledgeBaseName)
+type DeleteKnowledgeBaseParams struct {
+	KnowledgeBaseID int32 `json:"knowledge_base_id"`
+	UserID          int32 `json:"user_id"`
+}
+
+func (q *Queries) DeleteKnowledgeBase(ctx context.Context, arg DeleteKnowledgeBaseParams) error {
+	_, err := q.db.Exec(ctx, deleteKnowledgeBase, arg.KnowledgeBaseID, arg.UserID)
 	return err
+}
+
+const listUserKnowledgeBases = `-- name: ListUserKnowledgeBases :many
+select id, name from knowledge_bases where user_id = $1
+`
+
+type ListUserKnowledgeBasesRow struct {
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
+}
+
+func (q *Queries) ListUserKnowledgeBases(ctx context.Context, userID int32) ([]ListUserKnowledgeBasesRow, error) {
+	rows, err := q.db.Query(ctx, listUserKnowledgeBases, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserKnowledgeBasesRow{}
+	for rows.Next() {
+		var i ListUserKnowledgeBasesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

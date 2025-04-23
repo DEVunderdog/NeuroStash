@@ -8,6 +8,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type ObjectKeysWithIDs struct {
+	ID        int32  `json:"id"`
+	ObjectKey string `json:"object_key"`
+}
+
+type SendMessageStructure struct {
+	IngestionJobID string              `json:"ingestion_job_id"`
+	Files          []ObjectKeysWithIDs `json:"files"`
+}
+
 func (client *QueueClient) Push(data []byte) error {
 	client.m.Lock()
 	if !client.isReady {

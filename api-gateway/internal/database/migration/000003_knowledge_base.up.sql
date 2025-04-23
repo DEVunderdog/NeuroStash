@@ -39,3 +39,4 @@ create unique index idx_unique_kb_name on "knowledge_bases" ("user_id", "name");
 create unique index idx_unique_kb_doc_combination on "knowledge_base_documents" ("knowledge_base_id", "document_id");
 
 create index idx_job_status on "ingestion_jobs" ("resource_id", "op_status");
+

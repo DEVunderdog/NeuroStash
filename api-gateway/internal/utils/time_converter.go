@@ -24,7 +24,7 @@ func ConvertPgTimestampToProtoTimestamp(ts *pgtype.Timestamptz) (*timestamppb.Ti
 }
 
 func ConvertProtoTimestampToPgTimestamp(pts *timestamppb.Timestamp) (*pgtype.Timestamptz, error) {
-	
+
 	err := pts.CheckValid()
 	if err != nil {
 		return &pgtype.Timestamptz{}, fmt.Errorf("input protobuf timestamp is invalid; %w", err)
