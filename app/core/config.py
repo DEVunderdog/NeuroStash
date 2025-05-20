@@ -1,6 +1,7 @@
 from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_core import MultiHostUrl
+from typing import Optional
 import os
 
 
@@ -10,6 +11,9 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    PROJECT_NAME: str
+    API_V1: str = "/api/v1"
 
     POSTGRES_SERVER: str
     POSTGRES_PORT: int
@@ -28,6 +32,15 @@ class Settings(BaseSettings):
             port=self.POSTGRES_PORT,
             path=self.POSTGRES_DB,
         )
+
+    AWS_REGION: str
+    AWS_KMS_KEY_ID: str
+    AWS_ACCESS_KEY_ID: Optional[str]
+    AWS_SECRET_ACCESS_KEY: Optional[str]
+
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+    JWT_ISSUER: str
+    JWT_AUDIENCE: str
 
 
 settings = Settings()

@@ -1,3 +1,6 @@
 venv
 rought.txt
 *.env
+__pycache__/
+*.py[cod]
+*$py.class

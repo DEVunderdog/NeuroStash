@@ -7,7 +7,7 @@ from sqlalchemy import pool
 
 from alembic import context
 from app.core.config import settings
-from app.models import Base
+from app.schema import Base
 
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
