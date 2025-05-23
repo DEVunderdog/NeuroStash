@@ -60,7 +60,6 @@ class EncryptionKey(Base, TimestampMixin):
 
     api_keys: Mapped[List["ApiKey"]] = relationship(back_populates="encryption_key")
 
-    # partial index
     __table_args__ = (
         Index("idx_encryption_keys_active", "id", postgresql_where=Column("is_active")),
     )

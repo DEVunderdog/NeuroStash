@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models import StandardResponse
+from app.dao.models import StandardResponse
 from typing import Any
 
 router = APIRouter(prefix="/health", tags=["health"])

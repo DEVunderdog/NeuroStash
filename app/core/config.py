@@ -1,4 +1,4 @@
-from pydantic import PostgresDsn, computed_field
+from pydantic import PostgresDsn, computed_field, EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_core import MultiHostUrl
 from typing import Optional
@@ -41,6 +41,17 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
     JWT_ISSUER: str
     JWT_AUDIENCE: str
+
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
+    SMTP_PORT: int = 587
+    SMTP_HOST: str | None = None
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    EMAILS_FROM_EMAIL: EmailStr | None = None
+    EMAILS_FROM_NAME: EmailStr | None = None
+
+    FIRST_ADMIN: EmailStr
 
 
 settings = Settings()

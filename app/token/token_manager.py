@@ -1,7 +1,6 @@
 from app.aws.client import AwsClientManager
 from typing import Dict, Tuple, Optional
 from app.token.token_models import (
-    EncryptedKeyInfoArg,
     KeyInfo,
     JwtPayloadData,
     TokenData,
@@ -10,6 +9,13 @@ from app.core.config import settings
 from datetime import timedelta, datetime, timezone
 from jose import JWTError, jwt
 from jose.constants import ALGORITHMS
+from sqlalchemy.orm import Session
+from app.dao.encryption_keys_dao import (
+    get_active_encryption_key,
+    get_other_encryption_keys,
+    create_encryption_key,
+)
+from app.token.symmetric_key import generate_symmetric_key
 import secrets
 import threading
 import logging
@@ -28,52 +34,78 @@ class KeyNotFoundError(Exception):
 class TokenManager:
     def __init__(
         self,
+        db: Session,
         aws_client_manager: AwsClientManager,
-        initial_encrypted_keys: Dict[int, EncryptedKeyInfoArg],
-        active_key_id: int,
     ):
-        if not initial_encrypted_keys:
-            raise ValueError("no encrypted keys provided")
-        if active_key_id not in initial_encrypted_keys:
-            raise ValueError(
-                f"active key id {active_key_id} not found in provided encrypted keys"
-            )
-
         self._aws_client_manager = aws_client_manager
+        self._db = db
         self._lock = threading.Lock()
-        self._active_key_config: Tuple[Dict[int, KeyInfo], int] = self._build_key_tuple(
-            initial_encrypted_keys, active_key_id
+        self._active_key_config: Tuple[Dict[int, KeyInfo], int] = (
+            self._build_active_key_tuple()
         )
 
-    def _decrypt_keys(
-        self, encrypted_keys: Dict[int, EncryptedKeyInfoArg]
-    ) -> Dict[int, KeyInfo]:
-        decrypted_keys: Dict[int, KeyInfo] = {}
-        for key_id, value in encrypted_keys.items():
-            decrypted_key_bytes = self._aws_client_manager.decrypt_key(value.key_bytes)
+    def _build_active_key_tuple(self) -> Tuple[Dict[int, KeyInfo], int]:
+        active_encryption_keys = get_active_encryption_key(db=self._db)
+        other_encryption_keys = get_other_encryption_keys(db=self._db)
+        active_id: int = None
+        key_info: Dict[int, KeyInfo] = {}
+        decrypted_key_info: Dict[int, KeyInfo] = {}
+        if active_encryption_keys is None:
+            symmetric_key = generate_symmetric_key()
+            cipher_key = self._aws_client_manager.encrypt_key(key_blob=symmetric_key)
+            if cipher_key is None:
+                logger.error("cipher key is None")
+                raise RuntimeError("error encrypting keys")
+            active_id = create_encryption_key(symmetric_key=cipher_key)
+            key_info[active_id] = KeyInfo(key=cipher_key)
+        else:
+            active_id = active_encryption_keys.id
+            key_info[active_id] = KeyInfo(
+                key=active_encryption_keys.symmetric_key,
+                expires_at=active_encryption_keys.expired_at,
+            )
+
+        if len(other_encryption_keys) != 0:
+            for item in other_encryption_keys:
+                key_info[item.id] = KeyInfo(
+                    key=item.symmetric_key, expires_at=item.expired_at
+                )
+
+        for key_id, value in key_info.items():
+            decrypted_key_bytes = self._aws_client_manager.decrypt_key(value.key)
             if not decrypted_key_bytes:
+                logger.error(f"failed to decrypt symmetric key id {key_id}")
                 raise RuntimeError(f"failed to decrypt symmetric key id {key_id}")
-            decrypted_key_bytes[key_id] = KeyInfo(
+            decrypted_key_info[key_id] = KeyInfo(
                 key=decrypted_key_bytes, expires_at=value.expires_at
             )
-        return decrypted_keys
 
-    def _build_key_tuple(
-        self, encrypted_keys: Dict[int, EncryptedKeyInfoArg], active_key: int
-    ) -> Tuple[Dict[int, KeyInfo], int]:
-        decrypted_keys = self._decrypt_keys(encrypted_keys=encrypted_keys)
-
-        return (decrypted_keys, active_key)
+        return (decrypted_key_info, active_id)
 
     def get_keys(self) -> Tuple[Dict[int, KeyInfo], int]:
         return self._active_key_config
 
-    def update_active_keys(
-        self, new_encrypted_keys: Dict[int, EncryptedKeyInfoArg], new_active_id: int
-    ):
-        new_keys = self._build_key_tuple(new_encrypted_keys, new_active_id)
+    def rotate_keys_in_memory(self, active_key_id: int):
+        all_keys = get_other_encryption_keys(db=self._db)
+        if len(all_keys) == 0:
+            msg = "found zero encryption keys"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        key_info: Dict[int, KeyInfo] = {}
+        for item in all_keys:
+            decrypted_key_bytes = self._aws_client_manager.decrypt_key(
+                item.symmetric_key
+            )
+            if not decrypted_key_bytes:
+                msg = "failed to decrypt symmetric key while rotating keys"
+                logger.error(msg)
+                raise RuntimeError(msg)
+            key_info[item.id] = KeyInfo(
+                key=decrypted_key_bytes, expires_at=item.expired_at
+            )
         with self._lock:
-            self._active_key_config = new_keys
+            self._active_key_config = (key_info, active_key_id)
 
     def create_access_token(
         self, payload_data: JwtPayloadData, expires_delta: Optional[timedelta] = None
