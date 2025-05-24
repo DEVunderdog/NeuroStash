@@ -7,6 +7,7 @@ SQLALCHEMY_DATABASE_URL = str(settings.SQLALCHEMY_DATABASE_URI)
 engine = create_engine(
     url=str(settings.SQLALCHEMY_DATABASE_URI),
     pool_pre_ping=True,
+    connect_args={"options": "-c timezone=utc"},
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

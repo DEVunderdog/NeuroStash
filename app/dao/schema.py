@@ -55,7 +55,7 @@ class EncryptionKey(Base, TimestampMixin):
         Boolean, nullable=False, server_default=text("false")
     )
     expired_at: Mapped[Optional[datetime]] = mapped_column(
-        TIMESTAMP(timezone=False), nullable=True
+        TIMESTAMP(timezone=True), nullable=True
     )
 
     api_keys: Mapped[List["ApiKey"]] = relationship(back_populates="encryption_key")

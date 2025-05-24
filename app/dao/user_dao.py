@@ -1,18 +1,36 @@
 from sqlalchemy.orm import Session
-from app.dao.schema import UserClient, ClientRoleEnum
-from app.dao.models import UserClientCreate
-from app.core.config import settings
+from sqlalchemy import select
+from app.dao.schema import UserClient, ApiKey
+from app.dao.models import UserClientCreate, ApiKeyCreate
+from pydantic import EmailStr
+from typing import Tuple
+import logging
 
+logger = logging.getLogger(__name__)
 
-def first_admin(*, db: Session):
-    user = db.query(UserClient).where(UserClient.email == settings.FIRST_ADMIN).first()
-    if not user:
-        first_admin_user = UserClient(
-            email=settings.FIRST_ADMIN, role=ClientRoleEnum.ADMIN
+def register_user(
+    *, db: Session, user: UserClientCreate, api_key_params: ApiKeyCreate
+) -> Tuple[UserClient, ApiKey]:
+    try:
+        user_client = UserClient(**user.model_dump())
+        db.add(user_client)
+        api_key = ApiKey(
+            user_client=user_client,
+            key_id=api_key_params.key_id,
+            key_credential=api_key_params.key_credential,
+            key_signature=api_key_params.key_signature,
         )
-        db.add(first_admin_user)
+        db.add(api_key)
         db.commit()
-        db.refresh(first_admin_user)
+        db.refresh(user_client)
+        db.refresh(api_key)
+        return user_client, api_key
+    except Exception as e:
+        db.rollback()
+        raise RuntimeError(f"failed to register user: {e}") from e
 
-def register_user(*, db: Session, user: UserClientCreate):
-    pass
+
+def get_user(*, db: Session, email: EmailStr) -> UserClient | None:
+    stmt = select(UserClient).where(UserClient.email == email)
+    user = db.scalars(stmt).first()
+    return user

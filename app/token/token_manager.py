@@ -34,19 +34,18 @@ class KeyNotFoundError(Exception):
 class TokenManager:
     def __init__(
         self,
-        db: Session,
+        initial_db_session: Session,
         aws_client_manager: AwsClientManager,
     ):
         self._aws_client_manager = aws_client_manager
-        self._db = db
         self._lock = threading.Lock()
         self._active_key_config: Tuple[Dict[int, KeyInfo], int] = (
-            self._build_active_key_tuple()
+            self._build_active_key_tuple(db=initial_db_session)
         )
 
-    def _build_active_key_tuple(self) -> Tuple[Dict[int, KeyInfo], int]:
-        active_encryption_keys = get_active_encryption_key(db=self._db)
-        other_encryption_keys = get_other_encryption_keys(db=self._db)
+    def _build_active_key_tuple(self, db: Session) -> Tuple[Dict[int, KeyInfo], int]:
+        active_encryption_keys = get_active_encryption_key(db=db)
+        other_encryption_keys = get_other_encryption_keys(db=db)
         active_id: int = None
         key_info: Dict[int, KeyInfo] = {}
         decrypted_key_info: Dict[int, KeyInfo] = {}
@@ -71,12 +70,12 @@ class TokenManager:
                     key=item.symmetric_key, expires_at=item.expired_at
                 )
 
-        for key_id, value in key_info.items():
+        for key_id_iter, value in key_info.items():
             decrypted_key_bytes = self._aws_client_manager.decrypt_key(value.key)
             if not decrypted_key_bytes:
-                logger.error(f"failed to decrypt symmetric key id {key_id}")
-                raise RuntimeError(f"failed to decrypt symmetric key id {key_id}")
-            decrypted_key_info[key_id] = KeyInfo(
+                logger.error(f"failed to decrypt symmetric key id {key_id_iter}")
+                raise RuntimeError(f"failed to decrypt symmetric key id {key_id_iter}")
+            decrypted_key_info[key_id_iter] = KeyInfo(
                 key=decrypted_key_bytes, expires_at=value.expires_at
             )
 
@@ -85,8 +84,8 @@ class TokenManager:
     def get_keys(self) -> Tuple[Dict[int, KeyInfo], int]:
         return self._active_key_config
 
-    def rotate_keys_in_memory(self, active_key_id: int):
-        all_keys = get_other_encryption_keys(db=self._db)
+    def rotate_keys_in_memory(self, db: Session, active_key_id: int):
+        all_keys = get_other_encryption_keys(db=db)
         if len(all_keys) == 0:
             msg = "found zero encryption keys"
             logger.error(msg)

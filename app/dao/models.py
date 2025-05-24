@@ -15,3 +15,8 @@ class UserClientBase(BaseModel):
 class UserClientCreate(UserClientBase):
     pass
 
+
+class ApiKeyCreate(BaseModel):
+    key_id: int
+    key_credential: bytes
+    key_signature: bytes
