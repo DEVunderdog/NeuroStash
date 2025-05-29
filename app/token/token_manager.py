@@ -2,7 +2,6 @@ from app.aws.client import AwsClientManager
 from typing import Dict, Tuple, Optional
 from app.token.token_models import (
     KeyInfo,
-    JwtPayloadData,
     TokenData,
 )
 from app.core.config import settings
@@ -107,7 +106,7 @@ class TokenManager:
             self._active_key_config = (key_info, active_key_id)
 
     def create_access_token(
-        self, payload_data: JwtPayloadData, expires_delta: Optional[timedelta] = None
+        self, payload_data: TokenData, expires_delta: Optional[timedelta] = None
     ) -> str:
         all_keys, active_key_id = self.get_keys()
         if active_key_id not in all_keys:
@@ -183,7 +182,7 @@ class TokenManager:
             logger.error(f"invalid token: {e}")
             raise
 
-    def generate_api_key(self) -> Tuple[str, str]:
+    def generate_api_key(self) -> Tuple[str, str, int]:
         all_keys, active_key_id = self.get_keys()
 
         random_bytes = secrets.token_bytes(24)
@@ -207,9 +206,9 @@ class TokenManager:
 
         api_key = f"{random_bytes_b64}.{signature_b64}"
 
-        return api_key, signature_b64
+        return api_key, signature_b64, active_key_id
 
-    def verify_api_key(self, api_key: str, key_hmac: str, kid: int) -> bool:
+    def verify_api_key(self, api_key: str, key_hmac: bytes, kid: int) -> bool:
         parts = api_key.split(".")
         if len(parts) != 2:
             return False
@@ -234,11 +233,10 @@ class TokenManager:
 
         try:
             client_signature_bytes = base64.urlsafe_b64decode(signature_b64 + "==")
-            stored_hmac_bytes = base64.urlsafe_b64decode(key_hmac + "==")
         except Exception as e:
             logger.error(f"error while ecoding signature and provided key hmac: {e}")
             return False
 
         return hmac.compare_digest(
             expected_signature_bytes, client_signature_bytes
-        ) and hmac.compare_digest(expected_signature_bytes, stored_hmac_bytes)
+        ) and hmac.compare_digest(expected_signature_bytes, key_hmac)

@@ -1,20 +1,20 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime, timezone
-from enum import Enum
-
-class Role(Enum):
-    USER = 1
-    ADMIN = 2
+from app.dao.schema import ClientRoleEnum
 
 
-class JwtPayloadData(BaseModel):
+class PayloadData(BaseModel):
     email: EmailStr
     user_id: int
-    role: Role
+    role: ClientRoleEnum
 
 
-class TokenData(JwtPayloadData):
+class TokenData(PayloadData):
+    pass
+
+
+class ApiData(PayloadData):
     pass
 
 
