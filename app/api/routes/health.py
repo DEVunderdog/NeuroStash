@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.dao.models import StandardResponse
 from typing import Any
 
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(prefix="/health", tags=["Health"])
 
 
 @router.get("/", response_model=StandardResponse)

@@ -40,7 +40,7 @@ class AwsClientManager:
             return None
         try:
             response = self.kms.encrypt(
-                KeyId=self.settings.AwsKmsKey, Plaintext=key_blob
+                KeyId=self.settings.AWS_KMS_KEY_ID, Plaintext=key_blob
             )
             return response.get("CiphertextBlob")
         except ClientError as e:
@@ -53,7 +53,7 @@ class AwsClientManager:
             return None
         try:
             response = self.kms.decrypt(
-                CiphertextBlob=ciphertext_blob, KeyId=self.settings.AwsKmsKey
+                CiphertextBlob=ciphertext_blob, KeyId=self.settings.AWS_KMS_KEY_ID
             )
             return response.get("Plaintext")
         except ClientError as e:

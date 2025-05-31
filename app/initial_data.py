@@ -1,12 +1,12 @@
 import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session as SqlSession
-from app.dao.user_dao import get_user, register_user
+from app.dao.user_dao import get_user_db, register_user
 from app.dao.models import UserClientCreate, ApiKeyCreate
 from app.dao.schema import ClientRoleEnum
 from app.aws.client import AwsClientManager
 from app.core.config import settings
-from app.token.token_manager import TokenManager, KeyNotFoundError
+from app.token_svc.token_manager import TokenManager, KeyNotFoundError
 from app.mail.mail import send_api_email
 
 logging.basicConfig(level=logging.DEBUG)
@@ -18,7 +18,7 @@ engine = create_engine(url=database_uri, pool_pre_ping=True)
 
 def init() -> None:
     with SqlSession(engine) as session:
-        existing_admin = get_user(db=session, email=settings.FIRST_ADMIN)
+        existing_admin = get_user_db(db=session, email=settings.FIRST_ADMIN)
         if existing_admin is None:
             logger.debug("initializing aws client")
             aws_client_manager = AwsClientManager(settings=settings)
@@ -40,7 +40,7 @@ def init() -> None:
 
             logger.debug("generating api key...")
             try:
-                api_key, signature = token_manager.generate_api_key()
+                api_key, signature, _ = token_manager.generate_api_key()
             except KeyNotFoundError as e:
                 logger.error(f"key not found for signing: {e}")
                 raise

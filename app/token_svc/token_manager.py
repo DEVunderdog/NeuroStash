@@ -1,6 +1,6 @@
 from app.aws.client import AwsClientManager
 from typing import Dict, Tuple, Optional
-from app.token.token_models import (
+from app.token_svc.token_models import (
     KeyInfo,
     TokenData,
 )
@@ -14,7 +14,7 @@ from app.dao.encryption_keys_dao import (
     get_other_encryption_keys,
     create_encryption_key,
 )
-from app.token.symmetric_key import generate_symmetric_key
+from app.token_svc.symmetric_key import generate_symmetric_key
 import secrets
 import threading
 import logging
@@ -54,7 +54,7 @@ class TokenManager:
             if cipher_key is None:
                 logger.error("cipher key is None")
                 raise RuntimeError("error encrypting keys")
-            active_id = create_encryption_key(symmetric_key=cipher_key)
+            active_id = create_encryption_key(db=db, symmetric_key=cipher_key)
             key_info[active_id] = KeyInfo(key=cipher_key)
         else:
             active_id = active_encryption_keys.id

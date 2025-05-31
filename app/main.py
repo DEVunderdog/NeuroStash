@@ -1,13 +1,12 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
-from fastapi.routing import APIRoute
 
 from app.api.main import api_router
 from app.core.config import settings
 from app.aws.client import AwsClientManager
 from app.core.db import SessionLocal
-from app.token.token_manager import TokenManager
+from app.token_svc.token_manager import TokenManager
 
 import logging
 
@@ -42,19 +41,11 @@ async def lifespan(app: FastAPI):
     finally:
         db_session_for_token.close()
         logger.debug("database session just for token is closed")
-
     yield
-
     logger.info("application is shutting down")
-
-
-def custom_generate_unique_id(route: APIRoute) -> str:
-    return f"{route.tags[0]}-{route.name}"
-
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
 )
 

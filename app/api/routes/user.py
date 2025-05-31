@@ -11,11 +11,10 @@ from app.api.deps import (
     SessionDep,
     TokenDep,
     get_token_payload,
-    get_db,
 )
-from app.token.token_models import TokenData
+from app.token_svc.token_models import TokenData
 from app.dao.schema import ClientRoleEnum
-from app.token.token_manager import KeyNotFoundError
+from app.token_svc.token_manager import KeyNotFoundError
 from app.dao.user_dao import (
     register_user,
     UserAlreadyExistsError,
@@ -26,7 +25,7 @@ from app.dao.user_dao import (
 
 import logging
 
-router = APIRouter(prefix="/user", tags=["user"])
+router = APIRouter(prefix="/user", tags=["User"])
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
     "/register",
     response_model=UserClientCreated,
     status_code=status.HTTP_201_CREATED,
-    tags=["Users", "Registration"],
     summary="register a new user and provision an api key via mail by Admin",
 )
 def register_user_to_app(
@@ -93,13 +91,12 @@ def register_user_to_app(
     "/list",
     response_model=ListUsers,
     status_code=status.HTTP_200_OK,
-    tags=["Users", "List"],
     summary="list of users",
 )
 def list_users(
+    db: SessionDep,
     limit: int = 10,
     offset: int = 0,
-    db: SessionDep = Depends(get_db),
     admin_payload: TokenData = Depends(get_token_payload),
 ):
     if admin_payload.role != ClientRoleEnum.ADMIN:
@@ -115,12 +112,11 @@ def list_users(
     "/promote/{user_id}",
     response_model=StandardResponse,
     status_code=status.HTTP_200_OK,
-    tags=["Users", "Promotion"],
     summary="promote users to admin role",
 )
 def promote_users(
     user_id: int,
-    db: SessionDep = Depends(get_db),
+    db: SessionDep,
     admin_payload: TokenData = Depends(get_token_payload),
 ):
     if admin_payload.role != ClientRoleEnum.ADMIN:
@@ -149,12 +145,11 @@ def promote_users(
     "/delete/{user_id}",
     response_model=StandardResponse,
     status_code=status.HTTP_200_OK,
-    tags=["Users", "Delete"],
     summary="delete users",
 )
 def delete_users(
     user_id: int,
-    db: SessionDep = Depends(get_db),
+    db: SessionDep,
     admin_payload: TokenData = Depends(get_token_payload),
 ):
     if admin_payload.role != ClientRoleEnum.ADMIN:

@@ -2,12 +2,12 @@ from collections.abc import Generator
 from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 from app.core.db import SessionLocal
-from fastapi import Depends, Request, HTTPException, status, Header, Request
+from fastapi import Depends, Request, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from app.aws.client import AwsClientManager
-from app.token.token_manager import TokenManager, KeyNotFoundError
+from app.token_svc.token_manager import TokenManager, KeyNotFoundError
 from app.core.config import settings
-from app.token.token_models import TokenData, ApiData
+from app.token_svc.token_models import TokenData, ApiData
 from jose import JWTError, ExpiredSignatureError
 from app.dao.api_keys_dao import get_api_key_for_verification
 
@@ -37,12 +37,12 @@ def get_token_manager(request: Request) -> TokenManager:
 
 
 SessionDep = Annotated[Session, Depends(get_db)]
-TokenDep = Annotated[TokenManager, Depends[get_token_manager]]
-AwsDep = Annotated[AwsClientManager, Depends[get_aws_client_manager]]
+TokenDep = Annotated[TokenManager, Depends(get_token_manager)]
+AwsDep = Annotated[AwsClientManager, Depends(get_aws_client_manager)]
 
 
 async def get_token_payload(
-    token: Annotated[Optional[str], Depends[oauth2_scheme]],
+    token: Annotated[Optional[str], Depends(oauth2_scheme)],
     token_manager: TokenDep,
 ) -> TokenData:
     if token is None:
@@ -86,9 +86,9 @@ async def get_token_payload(
 
 
 async def get_api_payload(
-    authorization: Annotated[Optional[str], Header()] = None,
-    db: SessionDep = Depends(),
-    token_manager: TokenDep = Depends(),
+    authorization: Annotated[Optional[str], Header()],
+    db: SessionDep,
+    token_manager: TokenDep,
 ) -> ApiData:
     if authorization is None:
         raise HTTPException(
