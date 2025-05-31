@@ -7,6 +7,10 @@ class StandardResponse(BaseModel):
     message: str
 
 
+class GeneratedToken(StandardResponse):
+    token: str
+
+
 class UserClientBase(BaseModel):
     email: EmailStr
     role: ClientRoleEnum

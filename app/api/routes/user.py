@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, HTTPException
+from fastapi import APIRouter, status, HTTPException
 from app.dao.models import (
     UserClientCreate,
     UserClientCreated,
@@ -7,12 +7,7 @@ from app.dao.models import (
     ListUsers,
     StandardResponse,
 )
-from app.api.deps import (
-    SessionDep,
-    TokenDep,
-    get_token_payload,
-)
-from app.token_svc.token_models import TokenData
+from app.api.deps import SessionDep, TokenDep, TokenPayloadDep
 from app.dao.schema import ClientRoleEnum
 from app.token_svc.token_manager import KeyNotFoundError
 from app.dao.user_dao import (
@@ -40,7 +35,7 @@ def register_user_to_app(
     user_in: RegisterUser,
     db: SessionDep,
     token_manager: TokenDep,
-    admin_payload: TokenData = Depends(get_token_payload),
+    admin_payload: TokenPayloadDep,
 ):
     if admin_payload.role != ClientRoleEnum.ADMIN:
         raise HTTPException(
@@ -94,10 +89,10 @@ def register_user_to_app(
     summary="list of users",
 )
 def list_users(
+    admin_payload: TokenPayloadDep,
     db: SessionDep,
     limit: int = 10,
     offset: int = 0,
-    admin_payload: TokenData = Depends(get_token_payload),
 ):
     if admin_payload.role != ClientRoleEnum.ADMIN:
         raise HTTPException(
@@ -117,7 +112,7 @@ def list_users(
 def promote_users(
     user_id: int,
     db: SessionDep,
-    admin_payload: TokenData = Depends(get_token_payload),
+    admin_payload: TokenPayloadDep,
 ):
     if admin_payload.role != ClientRoleEnum.ADMIN:
         raise HTTPException(
@@ -150,7 +145,7 @@ def promote_users(
 def delete_users(
     user_id: int,
     db: SessionDep,
-    admin_payload: TokenData = Depends(get_token_payload),
+    admin_payload: TokenPayloadDep,
 ):
     if admin_payload.role != ClientRoleEnum.ADMIN:
         raise HTTPException(

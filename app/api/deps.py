@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 from app.core.db import SessionLocal
 from fastapi import Depends, Request, HTTPException, status, Header
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from app.aws.client import AwsClientManager
 from app.token_svc.token_manager import TokenManager, KeyNotFoundError
 from app.core.config import settings
@@ -13,6 +13,13 @@ from app.dao.api_keys_dao import get_api_key_for_verification
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1}/auth/generate/token", auto_error=False
+)
+
+api_key_scheme = APIKeyHeader(
+    name="Authorization",
+    auto_error=False,
+    scheme_name="ApiKeyAuth",
+    description="enter api key in the format: ApiKey <YOUR_API_KEY>",
 )
 
 
@@ -86,10 +93,13 @@ async def get_token_payload(
 
 
 async def get_api_payload(
-    authorization: Annotated[Optional[str], Header()],
     db: SessionDep,
     token_manager: TokenDep,
-) -> ApiData:
+    _api_key_for_openapi: Annotated[Optional[str], Depends(api_key_scheme)] = None,
+    authorization: Annotated[
+        Optional[str], Header(alias="Authorization", convert_underscores=False)
+    ] = None,
+) -> Optional[ApiData]:
     if authorization is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -97,7 +107,7 @@ async def get_api_payload(
         )
 
     auth_parts = authorization.split(" ", 1)
-    if len(auth_parts) != 2 or auth_parts[0].lower() != "apikey":
+    if len(auth_parts) != 2 or auth_parts[0] != "ApiKey":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid api key authentication scheme. Expected 'ApiKey <key>'",
@@ -137,3 +147,7 @@ async def get_api_payload(
         user_id=verified_api_key.user_id,
         role=verified_api_key.user_role,
     )
+
+
+TokenPayloadDep = Annotated[TokenData, Depends(get_token_payload)]
+ApiPayloadDep = Annotated[ApiData, Depends(get_api_payload)]
