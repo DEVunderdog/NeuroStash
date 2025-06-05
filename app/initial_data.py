@@ -40,7 +40,7 @@ def init() -> None:
 
             logger.debug("generating api key...")
             try:
-                api_key, signature, _ = token_manager.generate_api_key()
+                api_key, api_key_bytes, signature, _ = token_manager.generate_api_key()
             except KeyNotFoundError as e:
                 logger.error(f"key not found for signing: {e}")
                 raise
@@ -55,7 +55,7 @@ def init() -> None:
                 _, active_key_id = token_manager.get_keys()
                 api_key_create = ApiKeyCreate(
                     key_id=active_key_id,
-                    key_credential=api_key,
+                    key_credential=api_key_bytes,
                     key_signature=signature,
                 )
                 _, _ = register_user(

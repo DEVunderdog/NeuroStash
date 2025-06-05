@@ -74,7 +74,7 @@ class UserClient(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     role: Mapped[ClientRoleEnum] = mapped_column(
-        SQLEnum(ClientRoleEnum, name="client_roles", create_type=True), nullable=False
+        SQLEnum(ClientRoleEnum, name="client_roles", create_type=False), nullable=False
     )
 
     api_keys: Mapped[List["ApiKey"]] = relationship(
@@ -129,7 +129,7 @@ class DocumentRegistry(Base, TimestampMixin):
     object_key: Mapped[str] = mapped_column(String(150), nullable=False)
     lock_status: Mapped[bool] = mapped_column(Boolean, nullable=False)
     op_status: Mapped[OperationStatusEnum] = mapped_column(
-        SQLEnum(OperationStatusEnum, name="operation_status", create_type=True),
+        SQLEnum(OperationStatusEnum, name="operation_status", create_type=False),
         nullable=False,
         server_default=OperationStatusEnum.PENDING.value,
     )
@@ -214,7 +214,7 @@ class IngestionJob(Base, TimestampMixin):
     )
     resource_id: Mapped[PyUuid] = mapped_column(pg_uuid(as_uuid=True), nullable=False)
     op_status: Mapped[OperationStatusEnum] = mapped_column(
-        SQLEnum(OperationStatusEnum, name="operation_status", create_type=True),
+        SQLEnum(OperationStatusEnum, name="operation_status", create_type=False),
         nullable=False,
         server_default=OperationStatusEnum.PENDING.value,
     )

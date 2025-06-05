@@ -9,6 +9,17 @@ from app.core.db import SessionLocal
 from app.token_svc.token_manager import TokenManager
 
 import logging
+import sys
+
+log_level_str = "DEBUG"
+numeric_log_level = getattr(logging, log_level_str, logging.INFO)
+
+logging.basicConfig(
+    level=numeric_log_level,
+    stream=sys.stdout,
+    format="%(levelname)-8s [%(asctime)s] [%(name)s] %(message)s (%(filename)s:%(lineno)d)",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +54,7 @@ async def lifespan(app: FastAPI):
         logger.debug("database session just for token is closed")
     yield
     logger.info("application is shutting down")
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

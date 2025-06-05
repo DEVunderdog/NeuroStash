@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 class KeyNotFoundError(Exception):
     pass
 
-
 class TokenManager:
     def __init__(
         self,
@@ -45,7 +44,7 @@ class TokenManager:
     def _build_active_key_tuple(self, db: Session) -> Tuple[Dict[int, KeyInfo], int]:
         active_encryption_keys = get_active_encryption_key(db=db)
         other_encryption_keys = get_other_encryption_keys(db=db)
-        active_id: int = None
+        active_id: Optional[int] = None
         key_info: Dict[int, KeyInfo] = {}
         decrypted_key_info: Dict[int, KeyInfo] = {}
         if active_encryption_keys is None:
@@ -118,7 +117,7 @@ class TokenManager:
         if active_key_info.is_expired():
             raise RuntimeError("active key has expired")
 
-        to_encode = payload_data.model_dump(exclude_unset=True)
+        to_encode = payload_data.model_dump(mode='json', exclude_unset=True)
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
@@ -136,7 +135,7 @@ class TokenManager:
             }
         )
 
-        headers = {"kid", active_key_id}
+        headers = {"kid": active_key_id}
         encoded_jwt = jwt.encode(
             to_encode,
             active_key_info.key.hex(),
@@ -182,7 +181,7 @@ class TokenManager:
             logger.error(f"invalid token: {e}")
             raise
 
-    def generate_api_key(self) -> Tuple[str, str, int]:
+    def generate_api_key(self) -> Tuple[str, bytes, bytes, int]:
         all_keys, active_key_id = self.get_keys()
 
         random_bytes = secrets.token_bytes(24)
@@ -206,7 +205,9 @@ class TokenManager:
 
         api_key = f"{random_bytes_b64}.{signature_b64}"
 
-        return api_key, signature_b64, active_key_id
+        api_key_bytes = api_key.encode("utf-8")
+
+        return api_key, api_key_bytes, signature_bytes, active_key_id
 
     def verify_api_key(self, api_key: str, key_hmac: bytes, kid: int) -> bool:
         parts = api_key.split(".")

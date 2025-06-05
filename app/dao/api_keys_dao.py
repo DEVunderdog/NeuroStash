@@ -21,15 +21,13 @@ def store_api_key(*, db: Session, api_key_params: StoreApiKey) -> ApiKey:
         raise RuntimeError(f"failed to store api key: {e}")
 
 
-def get_api_key_for_verification(*, db: Session, api_key: str) -> VerifiedApiKey:
+def get_api_key_for_verification(*, db: Session, api_key: bytes) -> VerifiedApiKey:
     u = aliased(UserClient)
-
-    api_key_bytes = api_key.encode("utf-8")
 
     stmt = (
         select(ApiKey, u.email.label("email"), u.role.label("role"))
         .join(u, ApiKey.user_client)
-        .where(ApiKey.key_credential == api_key_bytes)
+        .where(ApiKey.key_credential == api_key)
     )
 
     row = db.execute(stmt).first()

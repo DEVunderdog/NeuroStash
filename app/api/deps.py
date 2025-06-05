@@ -3,17 +3,14 @@ from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 from app.core.db import SessionLocal
 from fastapi import Depends, Request, HTTPException, status, Header
-from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
+from fastapi.security import HTTPBearer, APIKeyHeader
 from app.aws.client import AwsClientManager
 from app.token_svc.token_manager import TokenManager, KeyNotFoundError
-from app.core.config import settings
 from app.token_svc.token_models import TokenData, ApiData
 from jose import JWTError, ExpiredSignatureError
 from app.dao.api_keys_dao import get_api_key_for_verification
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1}/auth/generate/token", auto_error=False
-)
+oauth2_scheme = HTTPBearer(auto_error=False)
 
 api_key_scheme = APIKeyHeader(
     name="Authorization",
@@ -58,8 +55,10 @@ async def get_token_payload(
             detail="not authenticated: missing bearer token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    token_str = token.credentials
     try:
-        payload = token_manager.verify_token(token=token)
+        payload = token_manager.verify_token(token=token_str)
         if not payload:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token payload"
@@ -114,7 +113,9 @@ async def get_api_payload(
         )
     api_key_full_string = auth_parts[1]
 
-    verified_api_key = get_api_key_for_verification(db=db, api_key=api_key_full_string)
+    api_key_bytes = api_key_full_string.encode("utf-8")
+
+    verified_api_key = get_api_key_for_verification(db=db, api_key=api_key_bytes)
     if not verified_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="api key not found"
@@ -123,7 +124,7 @@ async def get_api_payload(
     try:
         is_valid = token_manager.verify_api_key(
             api_key=api_key_full_string,
-            key_hmac=verified_api_key.key_credential,
+            key_hmac=verified_api_key.key_signature,
             kid=verified_api_key.key_id,
         )
         if not is_valid:

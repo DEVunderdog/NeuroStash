@@ -1,24 +1,25 @@
-from fastapi import APIRouter, status, HTTPException
+import logging
+
+from fastapi import APIRouter, HTTPException, status
+
+from app.api.deps import SessionDep, TokenDep, TokenPayloadDep
 from app.dao.models import (
-    UserClientCreate,
-    UserClientCreated,
-    RegisterUser,
     ApiKeyCreate,
     ListUsers,
+    RegisterUser,
     StandardResponse,
+    UserClientCreate,
+    UserClientCreated,
 )
-from app.api.deps import SessionDep, TokenDep, TokenPayloadDep
 from app.dao.schema import ClientRoleEnum
-from app.token_svc.token_manager import KeyNotFoundError
 from app.dao.user_dao import (
-    register_user,
     UserAlreadyExistsError,
+    delete_user_db,
     list_users_db,
     promote_user_db,
-    delete_user_db,
+    register_user,
 )
-
-import logging
+from app.token_svc.token_manager import KeyNotFoundError
 
 router = APIRouter(prefix="/user", tags=["User"])
 
@@ -43,7 +44,9 @@ def register_user_to_app(
             detail="you are not authorized to perform this action",
         )
     try:
-        api_key, api_key_signature, active_key_id = token_manager.generate_api_key()
+        api_key, api_key_bytes, api_key_signature, active_key_id = (
+            token_manager.generate_api_key()
+        )
     except KeyNotFoundError as e:
         logger.error("cannot create api key while registering user", exc_info=e)
         raise HTTPException(
@@ -61,7 +64,7 @@ def register_user_to_app(
         user = UserClientCreate(email=user_in.email, role=ClientRoleEnum.USER)
         api_key_params = ApiKeyCreate(
             key_id=active_key_id,
-            key_credential=api_key,
+            key_credential=api_key_bytes,
             key_signature=api_key_signature,
         )
         db_user_client, db_api_key = register_user(
@@ -100,7 +103,7 @@ def list_users(
             detail="you are not authorized to perform this action",
         )
     users = list_users_db(db=db, limit=limit, offset=offset)
-    return ListUsers(users=users)
+    return ListUsers(message="successfully fetched users", users=users)
 
 
 @router.patch(

@@ -56,6 +56,8 @@ class IndividualListedUser(BaseModel):
     id: int
     email: str
 
+    model_config = ConfigDict(from_attributes=True)
 
-class ListUsers(BaseModel):
+
+class ListUsers(StandardResponse):
     users: List[IndividualListedUser]
