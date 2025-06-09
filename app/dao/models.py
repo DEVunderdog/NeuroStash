@@ -61,3 +61,8 @@ class IndividualListedUser(BaseModel):
 
 class ListUsers(StandardResponse):
     users: List[IndividualListedUser]
+
+
+class GeneratedApiKey(StandardResponse):
+    api_key: str
+
