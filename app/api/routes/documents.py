@@ -98,9 +98,7 @@ def upload_documents(
     status_code=status.HTTP_200_OK,
     summary="finalized failed and successful files",
 )
-def post_upload_documents(
-    req: FinalizeDocumentReq, db: SessionDep, payload: TokenPayloadDep
-):
+def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
     if req.failed == 0 and req.successful == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -119,7 +117,7 @@ def post_upload_documents(
 
 
 @router.get(
-    "list",
+    "/list",
     response_model=ListDocuments,
     status_code=status.HTTP_200_OK,
     summary="list of documents",
@@ -127,9 +125,13 @@ def post_upload_documents(
 def list_documents(db: SessionDep, payload: TokenPayloadDep):
     try:
         db_documents = list_files(db=db, user_id=payload.user_id)
+        if not db_documents:
+            return ListDocuments(documents=[], message="none documents found")
         response_documents = [Document.model_validate(doc) for doc in db_documents]
 
-        return ListDocuments(documents=response_documents)
+        return ListDocuments(
+            documents=response_documents, message="successfully fetched documents"
+        )
     except Exception as e:
         logger.error("error listing documents", exc_info=e)
         raise HTTPException(
@@ -139,7 +141,7 @@ def list_documents(db: SessionDep, payload: TokenPayloadDep):
 
 
 @router.delete(
-    "delete/{file_id}",
+    "/delete/{file_id}",
     response_model=StandardResponse,
     status_code=status.HTTP_200_OK,
     summary="delete documents",
@@ -150,16 +152,17 @@ def delete_file(
     ids = [file_id]
     try:
         object_keys = lock_documents(db=db, document_ids=ids, user_id=payload.user_id)
-        if len(object_keys) == 0:
-            msg = "none documents found"
-            logger.info(msg)
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg)
     except Exception as e:
         msg = "error locking documents for deletion, please sync up"
         logger.error(msg, exc_info=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
+    
+    if len(object_keys) == 0:
+        msg = "none documents found"
+        logger.info(msg)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg)
 
     try:
         aws_client.multiple_delete_objects(object_keys=object_keys)
@@ -183,7 +186,7 @@ def delete_file(
 
 
 @router.get(
-    "cleanup",
+    "/cleanup",
     response_model=StandardResponse,
     status_code=status.HTTP_200_OK,
     summary="cleanup successful",
@@ -191,7 +194,7 @@ def delete_file(
 def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
     conflicting_docs = conflicted_docs(db=db, user_id=payload.user_id)
 
-    if len(conflicted_docs) == 0:
+    if not conflicted_docs:
         return StandardResponse(message="none conflicting files found")
 
     to_be_unlocked = []
@@ -204,7 +207,7 @@ def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
         else:
             to_be_unlocked.append(doc.id)
 
-    if to_be_deleted and to_be_unlocked:
+    if to_be_deleted or to_be_unlocked:
         try:
             cleanup_docs(
                 db=db,

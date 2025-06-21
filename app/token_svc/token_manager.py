@@ -122,7 +122,7 @@ class TokenManager:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
             expire = datetime.now(timezone.utc) + timedelta(
-                minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+                hours=settings.JWT_ACCESS_TOKEN_HOURS
             )
 
         to_encode.update(

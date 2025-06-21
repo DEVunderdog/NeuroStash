@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     AWS_BUCKET_NAME: str
     AWS_PRESIGNED_URL_EXP: int
 
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+    JWT_ACCESS_TOKEN_HOURS: int
     JWT_ISSUER: str
     JWT_AUDIENCE: str
 

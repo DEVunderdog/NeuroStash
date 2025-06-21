@@ -20,8 +20,13 @@ logging.basicConfig(
     format="%(levelname)-8s [%(asctime)s] [%(name)s] %(message)s (%(filename)s:%(lineno)d)",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+logging.getLogger('sqlalchemy.dialects').setLevel(logging.INFO)
+logging.getLogger('sqlalchemy.pool').setLevel(logging.INFO)
+logging.getLogger('sqlalchemy.orm').setLevel(logging.INFO)
+logging.getLogger('sqlalchemy.engine').setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)
+
 
 
 @asynccontextmanager

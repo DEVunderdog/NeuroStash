@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import insert, update, select, case, delete, or_, and_
+from sqlalchemy import insert, update, select, case, delete, or_, and_, cast
 from sqlalchemy.exc import IntegrityError
 from app.dao.models import CreateDocument
 from app.dao.schema import DocumentRegistry, OperationStatusEnum
@@ -57,8 +57,20 @@ def finalize_documents(*, db: Session, successful: List[int], failed: List[int])
             .where(DocumentRegistry.id.in_(all_ids))
             .values(
                 op_status=case(
-                    (DocumentRegistry.id.in_(successful), OperationStatusEnum.SUCCESS),
-                    (DocumentRegistry.id.in_(failed), OperationStatusEnum.FAILED),
+                    (
+                        DocumentRegistry.id.in_(successful),
+                        cast(
+                            OperationStatusEnum.SUCCESS.value,
+                            DocumentRegistry.op_status.type,
+                        ),
+                    ),
+                    (
+                        DocumentRegistry.id.in_(failed),
+                        cast(
+                            OperationStatusEnum.FAILED.value,
+                            DocumentRegistry.op_status.type,
+                        ),
+                    ),
                 ),
                 lock_status=False,
             )
@@ -77,7 +89,7 @@ def list_files(*, db: Session, user_id: int) -> List[DocumentRegistry]:
     try:
         stmt = select(DocumentRegistry).where(
             DocumentRegistry.user_id == user_id,
-            DocumentRegistry.lock_status is False,
+            DocumentRegistry.lock_status == False,
             DocumentRegistry.op_status == OperationStatusEnum.SUCCESS,
         )
 
@@ -96,7 +108,7 @@ def lock_documents(*, db: Session, document_ids: List[int], user_id: int) -> Lis
             .where(
                 DocumentRegistry.id.in_(document_ids),
                 DocumentRegistry.op_status == OperationStatusEnum.SUCCESS,
-                DocumentRegistry.lock_status is False,
+                DocumentRegistry.lock_status == False,
                 DocumentRegistry.user_id == user_id,
             )
             .values(lock_status=True, op_status=OperationStatusEnum.PENDING)

@@ -97,5 +97,5 @@ class Document(BaseModel):
 class ListDocuments(StandardResponse):
     documents: List[Document]
 
-class DeleteDocumentsReq(BaseModel):
-    
+    class Config:
+        from_attributes = True
