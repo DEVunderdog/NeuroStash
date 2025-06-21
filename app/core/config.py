@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     AWS_KMS_KEY_ID: str
     AWS_ACCESS_KEY_ID: Optional[str]
     AWS_SECRET_ACCESS_KEY: Optional[str]
+    AWS_BUCKET_NAME: str
+    AWS_PRESIGNED_URL_EXP: int
 
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
     JWT_ISSUER: str

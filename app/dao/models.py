@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from app.dao.schema import ClientRoleEnum
-from typing import List
+from typing import List, Dict
 
 
 class StandardResponse(BaseModel):
@@ -66,3 +66,36 @@ class ListUsers(StandardResponse):
 class GeneratedApiKey(StandardResponse):
     api_key: str
 
+
+class GeneratedPresignedUrls(StandardResponse):
+    urls: Dict[int, str]
+
+
+class GeneratePresignedUrlsReq(BaseModel):
+    files: List[str]
+
+
+class CreateDocument(BaseModel):
+    user_id: int
+    file_name: str
+    object_key: str
+
+
+class FinalizeDocumentReq(BaseModel):
+    failed: List[int]
+    successful: List[int]
+
+
+class Document(BaseModel):
+    id: int
+    file_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class ListDocuments(StandardResponse):
+    documents: List[Document]
+
+class DeleteDocumentsReq(BaseModel):
+    
