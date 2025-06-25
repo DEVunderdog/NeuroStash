@@ -99,3 +99,8 @@ class ListDocuments(StandardResponse):
 
     class Config:
         from_attributes = True
+
+
+class CreateKbInDb(BaseModel):
+    user_id: int
+    name: str
