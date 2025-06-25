@@ -1,8 +1,9 @@
 import boto3
 import logging
 import os
+import json
 from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from app.core.config import Settings
 from app.constants.content_type import S3_CONTENT_TYPE_MAP
 
@@ -33,6 +34,26 @@ class S3ConfigurationError(S3OperationError):
     pass
 
 
+class SqsOperationError(Exception):
+    def __init__(
+        self,
+        message: str,
+        error_code: Optional[str] = None,
+        queue_name: Optional[str] = None,
+    ):
+        self.error_code = error_code
+        self.queue_name = queue_name
+        super().__init__(message)
+
+
+class SqsConfigurationError(SqsOperationError):
+    pass
+
+
+class SqsMessageError(SqsOperationError):
+    pass
+
+
 class AwsClientManager:
     def __init__(
         self,
@@ -54,6 +75,8 @@ class AwsClientManager:
         self.session = boto3.Session(**self.session_kwargs)
         self._kms_client = None
         self._s3_client = None
+        self._sqs_client = None
+        self._queue_url: str = None
 
     @property
     def kms(self):
@@ -66,6 +89,54 @@ class AwsClientManager:
         if self._s3_client is None:
             self._s3_client = self.session.client("s3")
         return self._s3_client
+
+    @property
+    def sqs(self):
+        if self._sqs_client is None:
+            self._sqs_client = self.session.client(
+                "sqs", region_name=self.settings.AWS_REGION
+            )
+        return self._sqs_client
+
+    def get_queue_url(self, use_cache: bool = True) -> str:
+        if use_cache:
+            return self._queue_url
+
+        try:
+            response = self.sqs.get_queue_url(QueueName=self.settings.AWS_QUEUE_NAME)
+            queue_url = response["QueueUrl"]
+
+            self._queue_url = queue_url
+            return queue_url
+
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            error_message = e.response.get("Error", {}).get("Message", str(e))
+
+            logger.error(
+                f"failed to get queue url for {self.settings.AWS_QUEUE_NAME}: {error_message}"
+            )
+
+            if error_code in [
+                "AWS.SimpleQueueService.NonExistentQueue",
+                "QueueDoesNotExist",
+            ]:
+                raise SqsConfigurationError(
+                    f"Queue '{self.settings.AWS_QUEUE_NAME}' does not exists",
+                    error_code=error_code,
+                    queue_name=self.settings.AWS_QUEUE_NAME,
+                )
+            elif error_code == "AccessDenied":
+                raise SqsConfigurationError(
+                    "access denied to queue", error_code=error_code
+                )
+            else:
+                raise SqsConfigurationError(
+                    f"failed to get queue url: {error_message}", error_code=error_code
+                )
+        except Exception as e:
+            logger.error("unexpected error getting queue url", exc_info=e)
+            raise SqsConfigurationError(f"unexpected error: {e}")
 
     def encrypt_key(self, key_blob: bytes) -> Optional[bytes]:
         if not self.kms or not self.kms_key_id:
@@ -248,3 +319,124 @@ class AwsClientManager:
                 f"Unexpected error checking object existence: {e}",
                 object_key=object_key,
             )
+
+    def _format_message_attributes(
+        self, attributes: Dict[str, Any]
+    ) -> Dict[str, Dict[str, str]]:
+        formatted = {}
+
+        for key, value in attributes.items():
+            if isinstance(value, str):
+                formatted[key] = {"StringValue": value, "DataType": "String"}
+            elif isinstance(value, (int, float)):
+                formatted[key] = {"StringValue": str(value), "DataType": "String"}
+            elif (
+                isinstance(value, dict)
+                and "StringValue" in value
+                and "DataType" in value
+            ):
+                formatted[key] = value
+            else:
+                formatted[key] = {
+                    "StringValue": json.dumps(value),
+                    "DataType": "String",
+                }
+
+        return formatted
+
+    def send_message(
+        self,
+        message_body: str,
+        message_attributes: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        try:
+            queue_url = self.get_queue_url()
+            params = {"QueueUrl": queue_url, "MessageBody": message_body}
+
+            if message_attributes:
+                params["MessageAttributes"] = self._format_message_attributes(
+                    message_attributes
+                )
+
+            response = self.sqs.send_message(**params)
+            message_id = response["MessageId"]
+
+            logger.info(f"message sent successfully. MessageId: {message_id}")
+            return message_id
+
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            error_message = e.response.get("Error", {}).get("Message", str(e))
+
+            logger.error(f"failed to send message: {error_message}")
+            raise SqsMessageError(
+                f"failed to send message: {error_message}", error_code=error_code
+            )
+        except Exception as e:
+            logger.error("unexpected error sending message", exc_info=e)
+            raise SqsMessageError(f"unexpected error: {e}")
+
+    def receive_message(
+        self,
+        max_messages: int = 5,
+        wait_time_seconds: int = 10,
+        message_attribute_names: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        try:
+            queue_url = self.get_queue_url()
+
+            params = {
+                "QueueUrl": queue_url,
+                "MaxNumberOfMessages": min(max_messages, 10),
+                "WaitTimeSeconds": min(wait_time_seconds, 20),
+            }
+
+            if message_attribute_names:
+                params["MessageAttributeNames"] = message_attribute_names
+            else:
+                params["MessageAttributeNames"] = ["All"]
+
+            response = self.sqs.receive_message(**params)
+            messages = response.get("Messages", [])
+            logger.debug(f"received {len(messages)}")
+            return messages
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            error_message = e.response.get("Error", {}).get("Message", str(e))
+
+            logger.error(f"failed to receive messages: {error_message}")
+            raise SqsMessageError(
+                f"failed to receive messages: {error_message}", error_code=error_code
+            )
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            error_message = e.response.get("Error", {}).get("Message", str(e))
+
+            logger.error(f"failed to receive messages: {error_message}")
+            raise SqsMessageError(
+                f"failed to receive messages: {error_message}", error_code=error_code
+            )
+        except Exception as e:
+            logger.error("unexpected error receiving messages", exc_info=True)
+            raise SqsMessageError(f"unexpected error: {e}")
+
+    def delete_message(self, receipt_handle: str) -> bool:
+        try:
+            queue_url = self.get_queue_url()
+
+            self.sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=receipt_handle)
+
+            logger.debug("message deleted successfully")
+            return True
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            error_message = e.response.get("Error", {}).get("Message", str(e))
+
+            logger.error(f"failed to delete message: {error_message}")
+            raise SqsMessageError(
+                f"failed to delete message: {error_message}", error_code=error_code
+            )
+        
+        except Exception as e:
+            logger.error("unexpected error deleting message", exc_info=e)
+            raise SqsMessageError(f"unexpected error: {e}")
