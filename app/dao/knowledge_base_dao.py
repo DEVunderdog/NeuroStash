@@ -37,9 +37,11 @@ def list_users_kb(
     return kb
 
 
-def delete_kb(*, db: Session, kb_id: int) -> bool:
+def delete_kb_db(*, db: Session, user_id: int, kb_id: int) -> bool:
     try:
-        stmt = delete(KnowledgeBase).where(KnowledgeBase.id == kb_id)
+        stmt = delete(KnowledgeBase).where(
+            KnowledgeBase.id == kb_id, KnowledgeBase.user_id == user_id
+        )
         result = db.execute(stmt)
         db.commit()
         return result.rowcount > 0

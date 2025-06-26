@@ -104,3 +104,14 @@ class ListDocuments(StandardResponse):
 class CreateKbInDb(BaseModel):
     user_id: int
     name: str
+
+
+class CreatedKb(StandardResponse):
+    id: int
+    kb_name: str
+
+    class Config:
+        from_attributes = True
+
+class ListedKb(CreatedKb):
+    knowledge_bases: List[CreatedKb]
