@@ -39,12 +39,12 @@ def create_document(
 
         return created_documents
 
-    except IntegrityError as e:
+    except IntegrityError:
         db.rollback()
         logging.error("integrity error during creating documents", exc_info=True)
         raise ValueError("duplicate file names or constraint violation")
 
-    except Exception as e:
+    except Exception:
         db.rollback()
         logging.error("error during bulk document creation", exc_info=True)
         raise
@@ -81,7 +81,7 @@ def finalize_documents(*, db: Session, successful: List[int], failed: List[int])
         db.execute(stmt)
 
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.error("error finalizing documents in database", exc_info=True)
         raise
@@ -98,8 +98,22 @@ def list_files(*, db: Session, user_id: int) -> List[DocumentRegistry]:
         documents = db.execute(stmt).scalars().all()
 
         return documents
-    except Exception as e:
+    except Exception:
         logger.error("error listing users documents from database", exc_info=True)
+        raise
+
+
+def get_object_keys_for_ingestion(
+    *, db: Session, ids: List[int], user_id: int
+) -> List[str]:
+    try:
+        stmt = select(DocumentRegistry.object_key).where(
+            DocumentRegistry.id.in_(ids), DocumentRegistry.user_id == user_id
+        )
+        result = db.execute(stmt)
+        return result.scalars().all()
+    except Exception:
+        logger.error("error fetching object keys from database", exc_info=True)
         raise
 
 
@@ -120,7 +134,7 @@ def lock_documents(*, db: Session, document_ids: List[int], user_id: int) -> Lis
         object_keys = [row.object_key for row in result.fetchall()]
         db.commit()
         return object_keys
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.error("error locking the documents", exc_info=True)
         raise
@@ -137,7 +151,7 @@ def delete_documents(*, db: Session, document_ids: List[int], user_id: int):
 
         db.execute(stmt)
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.error("error during deleting file in database", exc_info=True)
         raise
@@ -170,7 +184,7 @@ def conflicted_docs(*, db: Session, user_id: int) -> List[DocumentRegistry]:
 
         result = db.execute(stmt)
         return result.scalars().all()
-    except Exception as e:
+    except Exception:
         logger.error("error while fetching conflicted documents", exc_info=True)
         raise
 
@@ -198,7 +212,7 @@ def cleanup_docs(
             db.execute(stmt)
 
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.error("error cleaning up docs in database", exc_info=True)
         raise

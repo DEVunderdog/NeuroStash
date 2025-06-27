@@ -348,11 +348,11 @@ class AwsClientManager:
 
         return formatted
 
-    def send_message(
+    def send_sqs_message(
         self,
         message_body: SqsMessage,
         message_attributes: Optional[Dict[str, Any]] = None,
-    ) -> str:
+    ):
         try:
             queue_url = self.get_queue_url()
             body = message_body.model_dump_json()
@@ -367,7 +367,6 @@ class AwsClientManager:
             message_id = response["MessageId"]
 
             logger.info(f"message sent successfully. MessageId: {message_id}")
-            return message_id
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -381,7 +380,7 @@ class AwsClientManager:
             logger.error("unexpected error sending message", exc_info=True)
             raise SqsMessageError(f"unexpected error: {e}")
 
-    def receive_message(
+    def receive_sqs_message(
         self,
         max_messages: int = 5,
         wait_time_seconds: int = 10,

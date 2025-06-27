@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 from app.dao.schema import ClientRoleEnum
 from typing import List, Dict, Optional, Any
 
+
 class StandardResponse(BaseModel):
     message: str
 
@@ -112,11 +113,15 @@ class CreatedKb(StandardResponse):
     class Config:
         from_attributes = True
 
+
 class ListedKb(CreatedKb):
     knowledge_bases: List[CreatedKb]
 
+
 class SqsMessage(BaseModel):
-    object_key: str
+    object_keys: Optional[List[str]] = None
+    inclusion_prefix: Optional[str] = None
+
 
 class ReceivedSqsMessage(BaseModel):
     message_id: str
@@ -125,3 +130,7 @@ class ReceivedSqsMessage(BaseModel):
     attributes: Optional[Dict[str, Any]] = None
     message_attributes: Optional[Dict[str, Any]] = None
 
+class IngestionRequest(BaseModel):
+    file_based: bool = False
+    file_ids: Optional[List[int]]
+    inclusion_prefix: Optional[str]

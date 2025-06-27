@@ -25,7 +25,7 @@ def generate_token(token_manager: TokenDep, payload: ApiPayloadDep):
             email=payload.email, user_id=payload.user_id, role=payload.role
         )
         token = token_manager.create_access_token(payload_data=data)
-    except Exception as e:
+    except Exception:
         msg = "error generating token"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -47,7 +47,7 @@ def generate_user_api_keys(
         new_api_key, new_api_key_bytes, new_api_key_signature, active_key_id = (
             token_manager.generate_api_key()
         )
-    except KeyNotFoundError as e:
+    except KeyNotFoundError:
         logger.error(
             "cannot create api key, because signing key not found", exc_info=True
         )
@@ -55,7 +55,7 @@ def generate_user_api_keys(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="error while creating api key",
         )
-    except RuntimeError as e:
+    except RuntimeError:
         msg = "cannot create api key"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -72,7 +72,7 @@ def generate_user_api_keys(
                 key_signature=new_api_key_signature,
             ),
         )
-    except Exception as e:
+    except Exception:
         msg = "error storing generated api key"
         logger.error(msg, exc_info=True)
         raise HTTPException(

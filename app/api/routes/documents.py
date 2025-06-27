@@ -86,7 +86,7 @@ def upload_documents(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("an exception occured", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -110,7 +110,7 @@ def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
     try:
         finalize_documents(db=db, successful=req.successful, failed=req.failed)
         return StandardResponse(message="succcessfully finalized the documents")
-    except Exception as e:
+    except Exception:
         logger.exception("error finalizing document", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -134,7 +134,7 @@ def list_documents(db: SessionDep, payload: TokenPayloadDep):
         return ListDocuments(
             documents=response_documents, message="successfully fetched documents"
         )
-    except Exception as e:
+    except Exception:
         logger.error("error listing documents", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -154,7 +154,7 @@ def delete_file(
     ids = [file_id]
     try:
         object_keys = lock_documents(db=db, document_ids=ids, user_id=payload.user_id)
-    except Exception as e:
+    except Exception:
         msg = "error locking documents for deletion, please sync up"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -168,7 +168,7 @@ def delete_file(
 
     try:
         aws_client.multiple_delete_objects(object_keys=object_keys)
-    except Exception as e:
+    except Exception:
         msg = "error deleting objects from bucket"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -177,7 +177,7 @@ def delete_file(
 
     try:
         delete_documents(db=db, document_ids=ids, user_id=payload.user_id)
-    except Exception as e:
+    except Exception:
         msg = "error deleting documents, please sync up"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -217,7 +217,7 @@ def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
                 to_be_unlocked=to_be_unlocked,
                 to_be_deleted=to_be_deleted,
             )
-        except Exception as e:
+        except Exception:
             logger.error("error cleaning up docs", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -32,11 +32,11 @@ def create_knowledge_base(
             id=created_kb.id,
             kb_name=created_kb.name,
         )
-    except KnowledgeBaseAlreadyExists as e:
+    except KnowledgeBaseAlreadyExists:
         msg = "error creating knowlege base"
         logger.error(msg, exc_info=True)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, msg=msg)
-    except Exception as e:
+    except Exception:
         msg = "an exception occured while creating knowledge base"
         logger.exception(msg, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=msg)

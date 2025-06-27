@@ -47,13 +47,13 @@ def register_user_to_app(
         api_key, api_key_bytes, api_key_signature, active_key_id = (
             token_manager.generate_api_key()
         )
-    except KeyNotFoundError as e:
+    except KeyNotFoundError:
         logger.error("cannot create api key while registering user", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="error while creating api keys",
         )
-    except RuntimeError as e:
+    except RuntimeError:
         msg = "cannot create api key while registering user"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -70,11 +70,11 @@ def register_user_to_app(
         db_user_client, db_api_key = register_user(
             db=db, user=user, api_key_params=api_key_params
         )
-    except UserAlreadyExistsError as e:
+    except UserAlreadyExistsError:
         msg = "user already exists"
         logger.error(msg, exc_info=True)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
-    except Exception as e:
+    except Exception:
         msg = "error registering user and storing it"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -129,7 +129,7 @@ def promote_users(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="cannot find user with provided id",
             )
-    except Exception as e:
+    except Exception:
         msg = "error promoting user to admin"
         logger.error(msg, exc_info=True)
         raise HTTPException(
@@ -168,7 +168,7 @@ def delete_users(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="cannot find user with provided id",
             )
-    except Exception as e:
+    except Exception:
         msg = "error deleting user"
         logger.error(msg, exc_info=True)
         raise HTTPException(
