@@ -1,12 +1,12 @@
-from fastapi import APIRouter, status, HTTPException
-from app.dao.models import GeneratedToken
-from app.api.deps import TokenDep, ApiPayloadDep, SessionDep
-from app.token_svc.token_models import TokenData
-from app.dao.models import GeneratedApiKey, StoreApiKey
-from app.dao.api_keys_dao import store_api_key
-from app.token_svc.token_manager import KeyNotFoundError
 import logging
 
+from fastapi import APIRouter, HTTPException, status
+
+from app.api.deps import ApiPayloadDep, SessionDep, TokenDep
+from app.dao.api_keys_dao import store_api_key
+from app.dao.models import GeneratedApiKey, GeneratedToken, StoreApiKey
+from app.token_svc.token_manager import KeyNotFoundError
+from app.token_svc.token_models import TokenData
 
 router = APIRouter(prefix="/auth/generate", tags=["Token"])
 
@@ -27,7 +27,7 @@ def generate_token(token_manager: TokenDep, payload: ApiPayloadDep):
         token = token_manager.create_access_token(payload_data=data)
     except Exception as e:
         msg = "error generating token"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
@@ -48,14 +48,16 @@ def generate_user_api_keys(
             token_manager.generate_api_key()
         )
     except KeyNotFoundError as e:
-        logger.error("cannot create api key, because signing key not found", exc_info=e)
+        logger.error(
+            "cannot create api key, because signing key not found", exc_info=True
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="error while creating api key",
         )
     except RuntimeError as e:
         msg = "cannot create api key"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
@@ -72,7 +74,7 @@ def generate_user_api_keys(
         )
     except Exception as e:
         msg = "error storing generated api key"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )

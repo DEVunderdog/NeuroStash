@@ -1,11 +1,15 @@
-import boto3
+import json
 import logging
 import os
-import json
-from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
-from typing import Optional, List, Dict, Any
-from app.core.config import Settings
+from typing import Any, Dict, List, Optional
+
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
+from pydantic import ValidationError
+
 from app.constants.content_type import S3_CONTENT_TYPE_MAP
+from app.core.config import Settings
+from app.dao.models import ReceivedSqsMessage, SqsMessage
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +139,7 @@ class AwsClientManager:
                     f"failed to get queue url: {error_message}", error_code=error_code
                 )
         except Exception as e:
-            logger.error("unexpected error getting queue url", exc_info=e)
+            logger.error("unexpected error getting queue url", exc_info=True)
             raise SqsConfigurationError(f"unexpected error: {e}")
 
     def encrypt_key(self, key_blob: bytes) -> Optional[bytes]:
@@ -254,7 +258,7 @@ class AwsClientManager:
                 return True  # Consider deletion successful if object doesn't exist
             self._handle_client_error(e, "individual object deletion", object_key)
         except Exception as e:
-            logger.error("error deleting object due to exception", exc_info=e)
+            logger.error("error deleting object due to exception", exc_info=True)
             raise S3OperationError(
                 f"Unexpected error deleting object: {e}", object_key=object_key
             )
@@ -346,12 +350,13 @@ class AwsClientManager:
 
     def send_message(
         self,
-        message_body: str,
+        message_body: SqsMessage,
         message_attributes: Optional[Dict[str, Any]] = None,
     ) -> str:
         try:
             queue_url = self.get_queue_url()
-            params = {"QueueUrl": queue_url, "MessageBody": message_body}
+            body = message_body.model_dump_json()
+            params = {"QueueUrl": queue_url, "MessageBody": body}
 
             if message_attributes:
                 params["MessageAttributes"] = self._format_message_attributes(
@@ -373,7 +378,7 @@ class AwsClientManager:
                 f"failed to send message: {error_message}", error_code=error_code
             )
         except Exception as e:
-            logger.error("unexpected error sending message", exc_info=e)
+            logger.error("unexpected error sending message", exc_info=True)
             raise SqsMessageError(f"unexpected error: {e}")
 
     def receive_message(
@@ -381,7 +386,7 @@ class AwsClientManager:
         max_messages: int = 5,
         wait_time_seconds: int = 10,
         message_attribute_names: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ReceivedSqsMessage]:
         try:
             queue_url = self.get_queue_url()
 
@@ -399,7 +404,26 @@ class AwsClientManager:
             response = self.sqs.receive_message(**params)
             messages = response.get("Messages", [])
             logger.debug(f"received {len(messages)}")
-            return messages
+
+            parsed_messages = []
+            for raw_msg in messages:
+                try:
+                    message_body = json.loads(raw_msg["Body"])
+                    sqs_message = SqsMessage.model_validate(message_body)
+
+                    received_message = ReceivedSqsMessage(
+                        message_id=raw_msg["MessageId"],
+                        receipt_handle=raw_msg["ReceiptHandle"],
+                        body=sqs_message,
+                        attributes=raw_msg.get("Attributes"),
+                        message_attributes=raw_msg.get("MessageAttributes"),
+                    )
+                    parsed_messages.append(received_message)
+                except (json.JSONDecodeError, ValidationError):
+                    logger.error("failed to parse sqs message", exc_info=True)
+                    continue
+            return parsed_messages
+
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
             error_message = e.response.get("Error", {}).get("Message", str(e))
@@ -436,7 +460,7 @@ class AwsClientManager:
             raise SqsMessageError(
                 f"failed to delete message: {error_message}", error_code=error_code
             )
-        
+
         except Exception as e:
-            logger.error("unexpected error deleting message", exc_info=e)
+            logger.error("unexpected error deleting message", exc_info=True)
             raise SqsMessageError(f"unexpected error: {e}")

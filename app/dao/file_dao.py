@@ -1,10 +1,12 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import insert, update, select, case, delete, or_, and_, cast
+import logging
+from typing import List, Tuple
+
+from sqlalchemy import and_, case, cast, delete, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from app.dao.models import CreateDocument
 from app.dao.schema import DocumentRegistry, OperationStatusEnum
-from typing import List, Tuple
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +41,12 @@ def create_document(
 
     except IntegrityError as e:
         db.rollback()
-        logging.error("integrity error during creating documents", exc_info=e)
+        logging.error("integrity error during creating documents", exc_info=True)
         raise ValueError("duplicate file names or constraint violation")
 
     except Exception as e:
         db.rollback()
-        logging.error("error during bulk document creation", exc_info=e)
+        logging.error("error during bulk document creation", exc_info=True)
         raise
 
 
@@ -81,7 +83,7 @@ def finalize_documents(*, db: Session, successful: List[int], failed: List[int])
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error("error finalizing documents in database", exc_info=e)
+        logger.error("error finalizing documents in database", exc_info=True)
         raise
 
 
@@ -97,7 +99,7 @@ def list_files(*, db: Session, user_id: int) -> List[DocumentRegistry]:
 
         return documents
     except Exception as e:
-        logger.error("error listing users documents from database", exc_info=e)
+        logger.error("error listing users documents from database", exc_info=True)
         raise
 
 
@@ -120,7 +122,7 @@ def lock_documents(*, db: Session, document_ids: List[int], user_id: int) -> Lis
         return object_keys
     except Exception as e:
         db.rollback()
-        logger.error("error locking the documents", exc_info=e)
+        logger.error("error locking the documents", exc_info=True)
         raise
 
 
@@ -137,7 +139,7 @@ def delete_documents(*, db: Session, document_ids: List[int], user_id: int):
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error("error during deleting file in database", exc_info=e)
+        logger.error("error during deleting file in database", exc_info=True)
         raise
 
 
@@ -169,7 +171,7 @@ def conflicted_docs(*, db: Session, user_id: int) -> List[DocumentRegistry]:
         result = db.execute(stmt)
         return result.scalars().all()
     except Exception as e:
-        logger.error("error while fetching conflicted documents", exc_info=e)
+        logger.error("error while fetching conflicted documents", exc_info=True)
         raise
 
 
@@ -198,5 +200,5 @@ def cleanup_docs(
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error("error cleaning up docs in database", exc_info=e)
+        logger.error("error cleaning up docs in database", exc_info=True)
         raise

@@ -48,14 +48,14 @@ def register_user_to_app(
             token_manager.generate_api_key()
         )
     except KeyNotFoundError as e:
-        logger.error("cannot create api key while registering user", exc_info=e)
+        logger.error("cannot create api key while registering user", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="error while creating api keys",
         )
     except RuntimeError as e:
         msg = "cannot create api key while registering user"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
@@ -72,11 +72,11 @@ def register_user_to_app(
         )
     except UserAlreadyExistsError as e:
         msg = "user already exists"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     except Exception as e:
         msg = "error registering user and storing it"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
@@ -131,7 +131,7 @@ def promote_users(
             )
     except Exception as e:
         msg = "error promoting user to admin"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
@@ -170,7 +170,7 @@ def delete_users(
             )
     except Exception as e:
         msg = "error deleting user"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )

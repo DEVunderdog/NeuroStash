@@ -1,27 +1,29 @@
 import logging
 import uuid
-from fastapi import APIRouter, status, HTTPException
-from app.dao.models import (
-    GeneratedPresignedUrls,
-    GeneratePresignedUrlsReq,
-    CreateDocument,
-    StandardResponse,
-    FinalizeDocumentReq,
-    ListDocuments,
-    Document,
-)
-from app.api.deps import SessionDep, TokenPayloadDep, AwsDep
+from typing import Dict, List
+
+from fastapi import APIRouter, HTTPException, status
+
+from app.api.deps import AwsDep, SessionDep, TokenPayloadDep
+from app.aws.client import ClientError
 from app.dao.file_dao import (
+    cleanup_docs,
+    conflicted_docs,
     create_document,
+    delete_documents,
     finalize_documents,
     list_files,
     lock_documents,
-    delete_documents,
-    conflicted_docs,
-    cleanup_docs,
 )
-from app.aws.client import ClientError
-from typing import Dict, List
+from app.dao.models import (
+    CreateDocument,
+    Document,
+    FinalizeDocumentReq,
+    GeneratedPresignedUrls,
+    GeneratePresignedUrlsReq,
+    ListDocuments,
+    StandardResponse,
+)
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -85,7 +87,7 @@ def upload_documents(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except Exception as e:
-        logger.exception("an exception occured", exc_info=e)
+        logger.exception("an exception occured", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="error uploading document",
@@ -109,7 +111,7 @@ def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
         finalize_documents(db=db, successful=req.successful, failed=req.failed)
         return StandardResponse(message="succcessfully finalized the documents")
     except Exception as e:
-        logger.exception("error finalizing document", exc_info=e)
+        logger.exception("error finalizing document", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="error finalizing documents",
@@ -133,7 +135,7 @@ def list_documents(db: SessionDep, payload: TokenPayloadDep):
             documents=response_documents, message="successfully fetched documents"
         )
     except Exception as e:
-        logger.error("error listing documents", exc_info=e)
+        logger.error("error listing documents", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="error listing documents",
@@ -154,11 +156,11 @@ def delete_file(
         object_keys = lock_documents(db=db, document_ids=ids, user_id=payload.user_id)
     except Exception as e:
         msg = "error locking documents for deletion, please sync up"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
-    
+
     if len(object_keys) == 0:
         msg = "none documents found"
         logger.info(msg)
@@ -168,7 +170,7 @@ def delete_file(
         aws_client.multiple_delete_objects(object_keys=object_keys)
     except Exception as e:
         msg = "error deleting objects from bucket"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
@@ -177,7 +179,7 @@ def delete_file(
         delete_documents(db=db, document_ids=ids, user_id=payload.user_id)
     except Exception as e:
         msg = "error deleting documents, please sync up"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg
         )
@@ -216,7 +218,7 @@ def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
                 to_be_deleted=to_be_deleted,
             )
         except Exception as e:
-            logger.error("error cleaning up docs", exc_info=e)
+            logger.error("error cleaning up docs", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="error cleaning up docs",

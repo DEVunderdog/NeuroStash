@@ -1,11 +1,13 @@
 import logging
+
 from fastapi import APIRouter, HTTPException, status
+
 from app.api.deps import SessionDep, TokenPayloadDep
 from app.dao.knowledge_base_dao import (
-    create_kb_db,
     KnowledgeBaseAlreadyExists,
-    list_users_kb,
+    create_kb_db,
     delete_kb_db,
+    list_users_kb,
 )
 from app.dao.models import CreatedKb, CreateKbInDb, ListedKb, StandardResponse
 
@@ -32,11 +34,11 @@ def create_knowledge_base(
         )
     except KnowledgeBaseAlreadyExists as e:
         msg = "error creating knowlege base"
-        logger.error(msg, exc_info=e)
+        logger.error(msg, exc_info=True)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, msg=msg)
     except Exception as e:
         msg = "an exception occured while creating knowledge base"
-        logger.exception(msg, exc_info=e)
+        logger.exception(msg, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=msg)
 
 
