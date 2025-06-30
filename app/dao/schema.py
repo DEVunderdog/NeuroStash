@@ -187,6 +187,12 @@ class KnowledgeBaseDocument(Base, TimestampMixin):
         nullable=False,
     )
 
+    status: Mapped[OperationStatusEnum] = mapped_column(
+        SQLEnum(OperationStatusEnum, name="operation_status", create_type=False),
+        nullable=False,
+        server_default=OperationStatusEnum.PENDING.value,
+    )
+
     knowledge_base: Mapped["KnowledgeBase"] = relationship(
         back_populates="document_associations"
     )

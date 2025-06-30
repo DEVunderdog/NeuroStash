@@ -8,8 +8,15 @@ from app.dao.knowledge_base_dao import (
     create_kb_db,
     delete_kb_db,
     list_users_kb,
+    list_kb_docs,
 )
-from app.dao.models import CreatedKb, CreateKbInDb, ListedKb, StandardResponse
+from app.dao.models import (
+    CreatedKb,
+    CreateKbInDb,
+    ListedKb,
+    StandardResponse,
+    ListKbDocs,
+)
 
 router = APIRouter(prefix="/kb", tags=["Knowledge Base"])
 
@@ -49,12 +56,31 @@ def create_knowledge_base(
     summary="list of knowledge bases",
 )
 def list_kb(
-    *, db: SessionDep, payload: TokenPayloadDep, limit: int = 100, offset: int = 0
+    db: SessionDep, payload: TokenPayloadDep, limit: int = 100, offset: int = 0
 ):
     listed_kb = list_users_kb(
         db=db, limit=limit, offset=offset, user_id=payload.user_id
     )
     return ListedKb(message="successfully knowledge bases", knowledge_bases=listed_kb)
+
+
+@router.get(
+    "list/docs",
+    response_model=ListKbDocs,
+    status_code=status.HTTP_200_OK,
+    summary="list knowledge base documents",
+)
+def list_knowledge_base_docs(
+    db: SessionDep,
+    payload: TokenPayloadDep,
+    kb_id: int,
+    limit: int = 100,
+    offset: int = 0,
+):
+    result = list_kb_docs(
+        db=db, limit=limit, offset=offset, user_id=payload.user_id, kb_id=kb_id
+    )
+    return result
 
 
 @router.delete(
@@ -63,7 +89,7 @@ def list_kb(
     status_code=status.HTTP_200_OK,
     summary="delete knowledge base",
 )
-def delete_kb(*, db: SessionDep, payload: TokenPayloadDep, kb_id: int):
+def delete_kb(db: SessionDep, payload: TokenPayloadDep, kb_id: int):
     try:
         result = delete_kb_db(db=db, user_id=payload.user_id, kb_id=kb_id)
         if result:

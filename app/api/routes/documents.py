@@ -124,9 +124,13 @@ def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
     status_code=status.HTTP_200_OK,
     summary="list of documents",
 )
-def list_documents(db: SessionDep, payload: TokenPayloadDep):
+def list_documents(
+    db: SessionDep, payload: TokenPayloadDep, limit: int = 100, offset: int = 0
+):
     try:
-        db_documents = list_files(db=db, user_id=payload.user_id)
+        db_documents = list_files(
+            db=db, user_id=payload.user_id, limit=limit, offset=offset
+        )
         if not db_documents:
             return ListDocuments(documents=[], message="none documents found")
         response_documents = [Document.model_validate(doc) for doc in db_documents]

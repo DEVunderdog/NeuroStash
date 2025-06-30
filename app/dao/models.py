@@ -119,8 +119,10 @@ class ListedKb(CreatedKb):
 
 
 class SqsMessage(BaseModel):
-    object_keys: Optional[List[str]] = None
-    inclusion_prefix: Optional[str] = None
+    ingestion_job_id: int
+    job_resource_id: str
+    new_kb_doc_id: Optional[List[int]] = None
+    new_object_keys: Optional[List[str]] = None
 
 
 class ReceivedSqsMessage(BaseModel):
@@ -130,7 +132,25 @@ class ReceivedSqsMessage(BaseModel):
     attributes: Optional[Dict[str, Any]] = None
     message_attributes: Optional[Dict[str, Any]] = None
 
+
 class IngestionRequest(BaseModel):
-    file_based: bool = False
-    file_ids: Optional[List[int]]
-    inclusion_prefix: Optional[str]
+    kb_id: int
+    file_ids: List[int]
+
+
+class CreatedIngestionJob(BaseModel):
+    ingestion_id: int
+    ingestion_resource_id: str
+    new_kb_documents: List[int]
+    object_keys: List[str]
+    existing_kb_documents: List[int]
+
+class KbDoc(BaseModel):
+    id: int
+    kb_doc_id: int
+    file_name: str
+
+class ListKbDocs(StandardResponse):
+    docs: List[KbDoc]
+    total_count: int
+    knowledge_base_id: int

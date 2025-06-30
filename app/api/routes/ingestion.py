@@ -1,8 +1,9 @@
 import logging
+import uuid
 from fastapi import APIRouter, HTTPException, status
 from app.dao.models import StandardResponse, IngestionRequest, SqsMessage
 from app.api.deps import SessionDep, TokenPayloadDep, AwsDep
-from app.dao.file_dao import get_object_keys_for_ingestion
+from app.dao.ingestion_dao import create_ingestion_job
 
 router = APIRouter(prefix="/ingestion", tags=["Data Ingestion"])
 
@@ -19,24 +20,46 @@ def ingest_documents(
     req: IngestionRequest, db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep
 ):
     try:
-        if req.file_based:
-            if not req.file_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="please provide file ids if you wanted ingestion based on file ids",
-                )
-            object_keys = get_object_keys_for_ingestion(
-                db=db, ids=req.file_ids, user_id=payload.user_id
+        if not req.file_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="please provide file ids to ingest documents",
             )
-            if not object_keys:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="cannot find the files with provided ids",
-                )
-            aws_client.send_sqs_message(
-                message_body=SqsMessage(object_keys=object_keys)
+        job_resource_id = str(uuid.uuid4())
+        result = create_ingestion_job(
+            db=db,
+            document_ids=req.file_ids,
+            kb_id=req.kb_id,
+            job_resource_id=job_resource_id,
+            user_id=payload.user_id,
+        )
+        if (
+            not result.new_kb_documents and not result.object_keys
+        ) and not result.existing_kb_documents:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="cannot find any documents based on provided ids",
             )
-            return StandardResponse(message="successfully requested for ingestion")
+
+        if result.existing_kb_documents or (
+            not result.new_kb_documents and not result.object_keys
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="already exists documents in knowledge base",
+            )
+
+        message = SqsMessage(
+            ingestion_job_id=result.ingestion_id,
+            job_resource_id=result.ingestion_resource_id,
+        )
+
+        if result.new_kb_documents and result.object_keys:
+            message.new_kb_doc_id = result.new_kb_documents
+            message.new_object_keys = result.object_keys
+
+        aws_client.send_sqs_message(message_body=message)
+        return StandardResponse(message="successfully requested for ingestion")
     except Exception:
         logger.error("error ingesting documents", exc_info=True)
         raise HTTPException(

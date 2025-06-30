@@ -1,7 +1,7 @@
 import logging
 from typing import List, Tuple
 
-from sqlalchemy import and_, case, cast, delete, insert, or_, select, update
+from sqlalchemy import and_, case, cast, delete, insert, or_, select, update, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -87,7 +87,9 @@ def finalize_documents(*, db: Session, successful: List[int], failed: List[int])
         raise
 
 
-def list_files(*, db: Session, user_id: int) -> List[DocumentRegistry]:
+def list_files(
+    *, db: Session, user_id: int, limit: int, offset: int
+) -> Tuple[List[DocumentRegistry], int]:
     try:
         stmt = select(DocumentRegistry).where(
             DocumentRegistry.user_id == user_id,
@@ -95,25 +97,18 @@ def list_files(*, db: Session, user_id: int) -> List[DocumentRegistry]:
             DocumentRegistry.op_status == OperationStatusEnum.SUCCESS,
         )
 
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+
+        total_count = db.execute(count_stmt).scalar()
+
+        stmt = stmt.limit(limit=limit)
+        stmt = stmt.offset(offset=offset)
+
         documents = db.execute(stmt).scalars().all()
 
-        return documents
+        return documents, total_count
     except Exception:
         logger.error("error listing users documents from database", exc_info=True)
-        raise
-
-
-def get_object_keys_for_ingestion(
-    *, db: Session, ids: List[int], user_id: int
-) -> List[str]:
-    try:
-        stmt = select(DocumentRegistry.object_key).where(
-            DocumentRegistry.id.in_(ids), DocumentRegistry.user_id == user_id
-        )
-        result = db.execute(stmt)
-        return result.scalars().all()
-    except Exception:
-        logger.error("error fetching object keys from database", exc_info=True)
         raise
 
 
