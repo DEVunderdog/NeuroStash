@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.aws.client import AwsClientManager
 from app.core.db import SessionLocal
 from app.token_svc.token_manager import TokenManager
+from app.consumer.consumer import ConsumerManager
 
 import logging
 import sys
@@ -20,13 +21,12 @@ logging.basicConfig(
     format="%(levelname)-8s [%(asctime)s] [%(name)s] %(message)s (%(filename)s:%(lineno)d)",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logging.getLogger('sqlalchemy.dialects').setLevel(logging.INFO)
-logging.getLogger('sqlalchemy.pool').setLevel(logging.INFO)
-logging.getLogger('sqlalchemy.orm').setLevel(logging.INFO)
-logging.getLogger('sqlalchemy.engine').setLevel(logging.DEBUG)
+logging.getLogger("sqlalchemy.dialects").setLevel(logging.INFO)
+logging.getLogger("sqlalchemy.pool").setLevel(logging.INFO)
+logging.getLogger("sqlalchemy.orm").setLevel(logging.INFO)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)
-
 
 
 @asynccontextmanager
@@ -57,8 +57,21 @@ async def lifespan(app: FastAPI):
     finally:
         db_session_for_token.close()
         logger.debug("database session just for token is closed")
+
+    try:
+        consumer_manager = ConsumerManager(
+            aws_client_manager=app.state.aws_client_manager, settings=settings
+        )
+        app.state.consumer_manager = consumer_manager
+        await consumer_manager.start()
+    except Exception as e:
+        msg = f"failed to initialized consumer manager: {str(e)}"
+        logger.error(msg)
+        raise RuntimeError(msg) from e
     yield
     logger.info("application is shutting down")
+    if hasattr(app.state, "consumer_manager"):
+        await app.state.consumer_manager.stop()
 
 
 app = FastAPI(
