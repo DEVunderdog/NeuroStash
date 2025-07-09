@@ -86,6 +86,8 @@ def upload_documents(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("an exception occured", exc_info=True)
         raise HTTPException(
@@ -101,7 +103,7 @@ def upload_documents(
     summary="finalized failed and successful files",
 )
 def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
-    if req.failed == 0 and req.successful == 0:
+    if len(req.failed) == 0 and len(req.successful) == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="please provide documents to finalize",
@@ -128,15 +130,19 @@ def list_documents(
     db: SessionDep, payload: TokenPayloadDep, limit: int = 100, offset: int = 0
 ):
     try:
-        db_documents = list_files(
+        db_documents, total_count = list_files(
             db=db, user_id=payload.user_id, limit=limit, offset=offset
         )
-        if not db_documents:
-            return ListDocuments(documents=[], message="none documents found")
+        if len(db_documents) == 0:
+            return ListDocuments(
+                documents=[], total_count=total_count, message="none documents found"
+            )
         response_documents = [Document.model_validate(doc) for doc in db_documents]
 
         return ListDocuments(
-            documents=response_documents, message="successfully fetched documents"
+            documents=response_documents,
+            total_count=total_count,
+            message="successfully fetched documents",
         )
     except Exception:
         logger.error("error listing documents", exc_info=True)
@@ -155,6 +161,11 @@ def list_documents(
 def delete_file(
     db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep, file_id: int
 ):
+    if file_id == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="please provide file id to delete",
+        )
     ids = [file_id]
     try:
         object_keys = lock_documents(db=db, document_ids=ids, user_id=payload.user_id)

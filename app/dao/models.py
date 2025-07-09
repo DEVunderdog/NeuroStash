@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from app.dao.schema import ClientRoleEnum
 from typing import List, Dict, Optional, Any
 
@@ -22,6 +22,9 @@ class UserClientCreate(UserClientBase):
 
 class RegisterUser(BaseModel):
     email: EmailStr
+
+    class Config:
+        schema_extra = {"example": {"email": "john@example.com"}}
 
 
 class UserClientCreated(BaseModel):
@@ -55,6 +58,7 @@ class VerifiedApiKey(BaseModel):
 class IndividualListedUser(BaseModel):
     id: int
     email: str
+    role: ClientRoleEnum
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -74,6 +78,9 @@ class GeneratedPresignedUrls(StandardResponse):
 class GeneratePresignedUrlsReq(BaseModel):
     files: List[str]
 
+    class Config:
+        schema_extra = {"example": {"files": ["fileA", "fileB", "fileC"]}}
+
 
 class CreateDocument(BaseModel):
     user_id: int
@@ -84,6 +91,9 @@ class CreateDocument(BaseModel):
 class FinalizeDocumentReq(BaseModel):
     failed: List[int]
     successful: List[int]
+
+    class Config:
+        schema_extra = {"example": {"failed": [1, 2, 3], "successful": [1, 2, 5]}}
 
 
 class Document(BaseModel):
@@ -96,6 +106,7 @@ class Document(BaseModel):
 
 class ListDocuments(StandardResponse):
     documents: List[Document]
+    total_count: int
 
     class Config:
         from_attributes = True
@@ -106,16 +117,32 @@ class CreateKbInDb(BaseModel):
     name: str
 
 
-class CreatedKb(StandardResponse):
+class CreateKbReq(BaseModel):
+    name: str = Field(..., min_length=5, max_length=50)
+
+    class Config:
+        schema_extra = {"example": {"name": "dummy-knowledge-base"}}
+
+
+class KnowledgeBaseItem(BaseModel):
     id: int
-    kb_name: str
+    name: str
 
     class Config:
         from_attributes = True
 
 
-class ListedKb(CreatedKb):
-    knowledge_bases: List[CreatedKb]
+class CreatedKb(StandardResponse, KnowledgeBaseItem):
+    class Config:
+        from_attributes = True
+
+
+class ListedKb(StandardResponse):
+    knowledge_bases: List[KnowledgeBaseItem]
+    total_count: int
+
+    class Config:
+        from_attributes = True
 
 
 class SqsMessage(BaseModel):
@@ -137,6 +164,9 @@ class IngestionRequest(BaseModel):
     kb_id: int
     file_ids: List[int]
 
+    class Config:
+        schema_extra = {"example": {"kb_id": 5, "file_ids": [1, 5, 6]}}
+
 
 class CreatedIngestionJob(BaseModel):
     ingestion_id: int
@@ -145,10 +175,12 @@ class CreatedIngestionJob(BaseModel):
     object_keys: List[str]
     existing_kb_documents: List[int]
 
+
 class KbDoc(BaseModel):
     id: int
     kb_doc_id: int
     file_name: str
+
 
 class ListKbDocs(StandardResponse):
     docs: List[KbDoc]

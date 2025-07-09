@@ -1,13 +1,15 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
+from fastapi.exceptions import RequestValidationError
 
 from app.api.main import api_router
 from app.core.config import settings
 from app.aws.client import AwsClientManager
 from app.core.db import SessionLocal
 from app.token_svc.token_manager import TokenManager
-from app.consumer.consumer import ConsumerManager
+from app.consumer.consumer_manager import ConsumerManager
+from app.core.exceptions import request_validation_exception_handler
 
 import logging
 import sys
@@ -40,7 +42,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         msg = f"failed to initialized aws client: {e}"
         logger.error(msg)
-        raise RuntimeError(msg) from e
+        raise
 
     db_session_for_token: Session = SessionLocal()
     try:
@@ -53,7 +55,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         msg = f"failed to initialize token: {e}"
         logger.error(msg)
-        raise RuntimeError(msg) from e
+        raise
     finally:
         db_session_for_token.close()
         logger.debug("database session just for token is closed")
@@ -67,7 +69,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         msg = f"failed to initialized consumer manager: {str(e)}"
         logger.error(msg)
-        raise RuntimeError(msg) from e
+        raise
     yield
     logger.info("application is shutting down")
     if hasattr(app.state, "consumer_manager"):
@@ -78,5 +80,7 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     lifespan=lifespan,
 )
+
+app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
 
 app.include_router(api_router, prefix=settings.API_V1)

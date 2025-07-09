@@ -20,10 +20,16 @@ def ingest_documents(
     req: IngestionRequest, db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep
 ):
     try:
-        if not req.file_ids:
+        if len(req.file_ids) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="please provide file ids to ingest documents",
+            )
+
+        if req.kb_id == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="please provide knowledge base kb_id to ingest documents",
             )
         job_resource_id = str(uuid.uuid4())
         result = create_ingestion_job(
@@ -60,6 +66,8 @@ def ingest_documents(
 
         aws_client.send_sqs_message(message_body=message)
         return StandardResponse(message="successfully requested for ingestion")
+    except HTTPException:
+        raise
     except Exception:
         logger.error("error ingesting documents", exc_info=True)
         raise HTTPException(

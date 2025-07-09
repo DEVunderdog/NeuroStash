@@ -122,6 +122,12 @@ def promote_users(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="you are not authorized to perform this action",
         )
+
+    if user_id == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="please provide user_id to promote",
+        )
     try:
         user_client = promote_user_db(db=db, user_id=user_id)
         if user_client is None:
@@ -129,6 +135,8 @@ def promote_users(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="cannot find user with provided id",
             )
+    except HTTPException:
+        raise
     except Exception:
         msg = "error promoting user to admin"
         logger.error(msg, exc_info=True)
@@ -156,6 +164,12 @@ def delete_users(
             detail="you are not authorized to peform this action",
         )
 
+    if user_id == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="please provide user_id to delete",
+        )
+
     if admin_payload.user_id == user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="you cannot delete yourself"
@@ -168,6 +182,8 @@ def delete_users(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="cannot find user with provided id",
             )
+    except HTTPException:
+        raise
     except Exception:
         msg = "error deleting user"
         logger.error(msg, exc_info=True)

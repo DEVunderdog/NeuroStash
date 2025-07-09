@@ -80,7 +80,6 @@ class AwsClientManager:
         self._kms_client = None
         self._s3_client = None
         self._sqs_client = None
-        self._queue_url: str = None
 
     @property
     def kms(self):
@@ -101,46 +100,6 @@ class AwsClientManager:
                 "sqs", region_name=self.settings.AWS_REGION
             )
         return self._sqs_client
-
-    def get_queue_url(self, use_cache: bool = True) -> str:
-        if use_cache:
-            return self._queue_url
-
-        try:
-            response = self.sqs.get_queue_url(QueueName=self.settings.AWS_QUEUE_NAME)
-            queue_url = response["QueueUrl"]
-
-            self._queue_url = queue_url
-            return queue_url
-
-        except ClientError as e:
-            error_code = e.response.get("Error", {}).get("Code", "Unknown")
-            error_message = e.response.get("Error", {}).get("Message", str(e))
-
-            logger.error(
-                f"failed to get queue url for {self.settings.AWS_QUEUE_NAME}: {error_message}"
-            )
-
-            if error_code in [
-                "AWS.SimpleQueueService.NonExistentQueue",
-                "QueueDoesNotExist",
-            ]:
-                raise SqsConfigurationError(
-                    f"Queue '{self.settings.AWS_QUEUE_NAME}' does not exists",
-                    error_code=error_code,
-                    queue_name=self.settings.AWS_QUEUE_NAME,
-                )
-            elif error_code == "AccessDenied":
-                raise SqsConfigurationError(
-                    "access denied to queue", error_code=error_code
-                )
-            else:
-                raise SqsConfigurationError(
-                    f"failed to get queue url: {error_message}", error_code=error_code
-                )
-        except Exception as e:
-            logger.error("unexpected error getting queue url", exc_info=True)
-            raise SqsConfigurationError(f"unexpected error: {e}")
 
     def encrypt_key(self, key_blob: bytes) -> Optional[bytes]:
         if not self.kms or not self.kms_key_id:
@@ -324,6 +283,18 @@ class AwsClientManager:
                 object_key=object_key,
             )
 
+    def download_file(self, object_key: str, temp_file_path: str):
+        try:
+            self.s3.download_file(
+                self.settings.AWS_BUCKET_NAME, object_key, temp_file_path
+            )
+            logger.debug(f"downloaded the file: {object_key}")
+        except ClientError as e:
+            logger.error("error downloading file", extra={"error": str(e)})
+            raise S3OperationError(
+                f"error downloading file: {str(e)}", object_key=object_key
+            )
+
     def _format_message_attributes(
         self, attributes: Dict[str, Any]
     ) -> Dict[str, Dict[str, str]]:
@@ -354,9 +325,8 @@ class AwsClientManager:
         message_attributes: Optional[Dict[str, Any]] = None,
     ):
         try:
-            queue_url = self.get_queue_url()
             body = message_body.model_dump_json()
-            params = {"QueueUrl": queue_url, "MessageBody": body}
+            params = {"QueueUrl": self.settings.AWS_QUEUE_URL, "MessageBody": body}
 
             if message_attributes:
                 params["MessageAttributes"] = self._format_message_attributes(
@@ -387,10 +357,9 @@ class AwsClientManager:
         message_attribute_names: Optional[List[str]] = None,
     ) -> List[ReceivedSqsMessage]:
         try:
-            queue_url = self.get_queue_url()
 
             params = {
-                "QueueUrl": queue_url,
+                "QueueUrl": self.settings.AWS_QUEUE_URL,
                 "MaxNumberOfMessages": min(max_messages, 10),
                 "WaitTimeSeconds": min(wait_time_seconds, 20),
             }
@@ -431,23 +400,16 @@ class AwsClientManager:
             raise SqsMessageError(
                 f"failed to receive messages: {error_message}", error_code=error_code
             )
-        except ClientError as e:
-            error_code = e.response.get("Error", {}).get("Code", "Unknown")
-            error_message = e.response.get("Error", {}).get("Message", str(e))
-
-            logger.error(f"failed to receive messages: {error_message}")
-            raise SqsMessageError(
-                f"failed to receive messages: {error_message}", error_code=error_code
-            )
         except Exception as e:
             logger.error("unexpected error receiving messages", exc_info=True)
             raise SqsMessageError(f"unexpected error: {e}")
 
     def delete_message(self, receipt_handle: str) -> bool:
         try:
-            queue_url = self.get_queue_url()
 
-            self.sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=receipt_handle)
+            self.sqs.delete_message(
+                QueueUrl=self.settings.AWS_QUEUE_URL, ReceiptHandle=receipt_handle
+            )
 
             logger.debug("message deleted successfully")
             return True

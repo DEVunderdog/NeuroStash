@@ -5,7 +5,7 @@ from app.dao.schema import UserClient, ApiKey, ClientRoleEnum
 from app.dao.models import UserClientCreate, ApiKeyCreate
 from pydantic import EmailStr
 from typing import List
-import psycopg2
+import psycopg
 
 from typing import Tuple
 import logging
@@ -38,7 +38,7 @@ def register_user(
         return user_client, api_key
     except IntegrityError as e:
         db.rollback()
-        if isinstance(e.orig, psycopg2.errors.UniqueViolation):
+        if isinstance(e.orig, psycopg.errors.UniqueViolation):
             raise UserAlreadyExistsError(email=user.email) from e
     except Exception as e:
         db.rollback()

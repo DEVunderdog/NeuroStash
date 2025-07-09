@@ -82,28 +82,6 @@ class TokenManager:
     def get_keys(self) -> Tuple[Dict[int, KeyInfo], int]:
         return self._active_key_config
 
-    def rotate_keys_in_memory(self, db: Session, active_key_id: int):
-        all_keys = get_other_encryption_keys(db=db)
-        if len(all_keys) == 0:
-            msg = "found zero encryption keys"
-            logger.error(msg)
-            raise RuntimeError(msg)
-
-        key_info: Dict[int, KeyInfo] = {}
-        for item in all_keys:
-            decrypted_key_bytes = self._aws_client_manager.decrypt_key(
-                item.symmetric_key
-            )
-            if not decrypted_key_bytes:
-                msg = "failed to decrypt symmetric key while rotating keys"
-                logger.error(msg)
-                raise RuntimeError(msg)
-            key_info[item.id] = KeyInfo(
-                key=decrypted_key_bytes, expires_at=item.expired_at
-            )
-        with self._lock:
-            self._active_key_config = (key_info, active_key_id)
-
     def create_access_token(
         self, payload_data: TokenData, expires_delta: Optional[timedelta] = None
     ) -> str:

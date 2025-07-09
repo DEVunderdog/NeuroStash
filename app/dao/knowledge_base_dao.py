@@ -9,7 +9,7 @@ from app.dao.schema import (
     OperationStatusEnum,
 )
 from typing import List, Tuple
-import psycopg2
+import psycopg
 
 
 class KnowledgeBaseAlreadyExists(Exception):
@@ -27,8 +27,10 @@ def create_kb_db(*, db: Session, kb: CreateKbInDb) -> KnowledgeBase:
         return knowledge_base
     except IntegrityError as e:
         db.rollback()
-        if isinstance(e.orig, psycopg2.errors.UniqueViolation):
+        if isinstance(e.orig, psycopg.errors.UniqueViolation):
             raise KnowledgeBaseAlreadyExists(knowledg_base_name=kb.name)
+        else:
+            raise RuntimeError(f"database integrity error: {e}")
     except Exception as e:
         db.rollback()
         raise RuntimeError(f"failed to create knowledge base in database: {e}")
@@ -69,8 +71,8 @@ def list_kb_docs(
             DocumentRegistry.user_id == user_id,
             DocumentRegistry.op_status == OperationStatusEnum.SUCCESS,
             DocumentRegistry.lock_status == False,
-            KnowledgeBaseDocument.op_status == OperationStatusEnum.SUCCESS,
             KnowledgeBaseDocument.knowledge_base_id == kb_id,
+            KnowledgeBaseDocument.status == OperationStatusEnum.SUCCESS
         )
     )
 
