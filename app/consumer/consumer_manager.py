@@ -43,7 +43,7 @@ class ConsumerManager:
                 if messages:
                     for message in messages:
                         logger.info(f"message: {message}")
-
+                        # process message via process manager
                         try:
                             await self._delete_message(message.receipt_handle)
                             logger.info(f"delete message: {message.message_id}")

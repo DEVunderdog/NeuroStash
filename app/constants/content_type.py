@@ -1,22 +1,13 @@
 S3_CONTENT_TYPE_MAP = {
-    # Text
     ".txt": "text/plain",
     ".html": "text/html",
     ".htm": "text/html",
-    ".css": "text/css",
-    ".js": "application/javascript",
     ".json": "application/json",
     ".xml": "application/xml",
     ".csv": "text/csv",
-    # Images
     ".jpeg": "image/jpeg",
     ".jpg": "image/jpeg",
     ".png": "image/png",
-    ".gif": "image/gif",
-    ".svg": "image/svg+xml",
-    ".webp": "image/webp",
-    ".ico": "image/vnd.microsoft.icon",
-    # Documents
     ".pdf": "application/pdf",
     ".doc": "application/msword",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -24,19 +15,7 @@ S3_CONTENT_TYPE_MAP = {
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".ppt": "application/vnd.ms-powerpoint",
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    # Audio/Video
-    ".mp3": "audio/mpeg",
-    ".mp4": "video/mp4",
-    ".wav": "audio/wav",
-    ".mov": "video/quicktime",
-    # Archives
-    ".zip": "application/zip",
-    ".tar": "application/x-tar",
-    ".gz": "application/gzip",
-    ".rar": "application/vnd.rar",
-    # Fonts
-    ".otf": "font/otf",
-    ".ttf": "font/ttf",
-    ".woff": "font/woff",
-    ".woff2": "font/woff2",
+    ".md": "text/markdown",
 }
+
+ALLOWED_EXTENSIONS = {ext.lower() for ext in S3_CONTENT_TYPE_MAP.keys()}

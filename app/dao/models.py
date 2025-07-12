@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
+import os
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
 from app.dao.schema import ClientRoleEnum
 from typing import List, Dict, Optional, Any
+from app.constants.content_type import ALLOWED_EXTENSIONS
 
 
 class StandardResponse(BaseModel):
@@ -76,10 +78,27 @@ class GeneratedPresignedUrls(StandardResponse):
 
 
 class GeneratePresignedUrlsReq(BaseModel):
-    files: List[str]
+    files: List[str] = Field(
+        ..., min_length=1, description="a list of filenames to upload"
+    )
+
+    @field_validator("files", mode="each")
+    @classmethod
+    def check_file_extension(cls, filename: str) -> str:
+        _root, extension = os.path.splitext(filename)
+
+        if not extension:
+            raise ValueError(f"File '{filename}' has no extension")
+
+        if extension.lower() not in ALLOWED_EXTENSIONS:
+            raise ValueError(
+                f"file type for '{filename}' is not allowed."
+                f"allowed extension are: {','.join(ALLOWED_EXTENSIONS)}"
+            )
+        return filename
 
     class Config:
-        schema_extra = {"example": {"files": ["fileA", "fileB", "fileC"]}}
+        schema_extra = {"example": {"files": ["mydocument.pdf", "photo.jpg"]}}
 
 
 class CreateDocument(BaseModel):

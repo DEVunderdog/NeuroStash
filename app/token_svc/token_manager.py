@@ -16,7 +16,6 @@ from app.dao.encryption_keys_dao import (
 )
 from app.token_svc.symmetric_key import generate_symmetric_key
 import secrets
-import threading
 import logging
 import os
 import base64
@@ -36,7 +35,6 @@ class TokenManager:
         aws_client_manager: AwsClientManager,
     ):
         self._aws_client_manager = aws_client_manager
-        self._lock = threading.Lock()
         self._active_key_config: Tuple[Dict[int, KeyInfo], int] = (
             self._build_active_key_tuple(db=initial_db_session)
         )
