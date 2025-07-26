@@ -56,5 +56,6 @@ class Settings(BaseSettings):
 
     FIRST_ADMIN: EmailStr
 
+    OPENAI_KEY: str
 
 settings = Settings()

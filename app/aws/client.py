@@ -112,7 +112,7 @@ class AwsClientManager:
             return response.get("CiphertextBlob")
         except ClientError as e:
             logger.error(f"error encrypting key with kms key id: {e}")
-            return None
+            raise
 
     def decrypt_key(self, ciphertext_blob: bytes) -> Optional[bytes]:
         if not self.kms or not self.kms_key_id:
@@ -125,7 +125,7 @@ class AwsClientManager:
             return response.get("Plaintext")
         except ClientError as e:
             logger.error(f"error decrypting key: {e}")
-            return None
+            raise
 
     def _handle_client_error(
         self, error: ClientError, operation: str, object_key: Optional[str] = None

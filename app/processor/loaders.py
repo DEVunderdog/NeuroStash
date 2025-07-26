@@ -7,8 +7,8 @@ from langchain_community.document_loaders import (
     UnstructuredPowerPointLoader,
     UnstructuredHTMLLoader,
     UnstructuredExcelLoader,
+    UnstructuredMarkdownLoader,
     JSONLoader,
-    UnstructuredImageLoader,
     CSVLoader,
 )
 from langchain_core.document_loaders import BaseLoader
@@ -46,10 +46,9 @@ LOADER_MAPPING = {
         "config": {"jq_schema": "..", "text_content": False},
     },
     ".txt": {"loader": TextLoader, "config": {"encoding": "utf-8"}},
-    ".jpeg": {"loader": UnstructuredImageLoader, "config": {}},
-    ".jpg": {"loader": UnstructuredImageLoader, "config": {}},
-    ".png": {"loader": UnstructuredImageLoader, "config": {}},
+    ".md": {"loader": UnstructuredMarkdownLoader, "config": {"mode": "elements"}},
 }
+
 
 # To maintain utility of it and stateless design of the factory we use static methods
 class DocumentLoaderFactory:

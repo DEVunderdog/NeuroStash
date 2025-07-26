@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from app.core.file_extension_validation import is_valid_file_extension
 from app.processor.loaders import DocumentLoaderFactory
-from app.processor.splitters import ContentSplitterFactory
+from app.processor.semantic_chunker import CustomSemanticChunker
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,9 @@ class ProcessorManager:
         self.aws_client_manager: AwsClientManager = aws_client_manager
         self.settings: Settings = settings
         self.db: Session = db
-        self.splitter_factory: ContentSplitterFactory = ContentSplitterFactory()
+        self.semantic_chunker: CustomSemanticChunker = CustomSemanticChunker(
+            settings=settings
+        )
 
     def process_message(self, message: ReceivedSqsMessage, db: Session):
         for object_key in message.body.new_object_keys:
@@ -46,8 +48,10 @@ class ProcessorManager:
                 loader = DocumentLoaderFactory.create_loader(file_path=temp_file)
                 if not loader:
                     continue
-                splitter = self.splitter_factory.create_splitter(ext=original_extension)
-                
+                documents = loader.load()
+                chunked_documents = self.semantic_chunker.transform_documents(
+                    documents=documents
+                )
 
             except Exception as e:
                 logger.error(

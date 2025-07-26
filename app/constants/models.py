@@ -1,0 +1,7 @@
+SPACY_MODEL = "en_core_web_sm"
+SPACY_PARSER = "parser"
+SPACY_TAGGER = "tagger"
+SPACY_NER = "ner"
+SPACY_LEM = "lemmatizer"
+SPACY_SENTENCIZER = "sentencizer"
+OPENAI_EMBEDDINGS_MODEL = "text-embedding-3-large"
