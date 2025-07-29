@@ -157,7 +157,7 @@ class KnowledgeBase(Base, TimestampMixin):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-
+    category: Mapped[str] = mapped_column(String(100), nullable=False)
     user_client: Mapped["UserClient"] = relationship(back_populates="knowledge_bases")
     document_associations: Mapped[List["KnowledgeBaseDocument"]] = relationship(
         back_populates="knowledge_base", cascade="all, delete-orphan"
@@ -166,7 +166,9 @@ class KnowledgeBase(Base, TimestampMixin):
         back_populates="knowledge_base", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (UniqueConstraint("user_id", "name", name="idx_unique_kb_name"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "category", name="idx_unique_kb_category"),
+    )
 
     def __repr__(self) -> str:
         return (
