@@ -46,6 +46,15 @@ class OperationStatusEnum(enum.Enum):
     FAILED = "FAILED"
 
 
+class ProvisionerStatusEnum(enum.Enum):
+    PROVISIONING = "PROVISIONING"
+    AVAILABLE = "AVAILABLE"
+    ASSIGNED = "ASSIGNED"
+    DESTROYED = "DESTROYED"
+    CLEANUP = "CLEANUP"
+    FAILED = "FAILED"
+
+
 class EncryptionKey(Base, TimestampMixin):
     __tablename__ = "encryption_keys"
 
@@ -148,12 +157,32 @@ class DocumentRegistry(Base, TimestampMixin):
         return f"<DocumentRegistry(id={self.id}, file_name='{self.file_name}', user_id={self.user_id})>"
 
 
+class MilvusCollections(Base, TimestampMixin):
+    __tablename__ = "milvus_collections"
+
+    id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
+    collection_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[ProvisionerStatusEnum] = mapped_column(
+        SQLEnum(ProvisionerStatusEnum, name="provisioner_status", create_type=False),
+        nullable=False,
+        server_default=ProvisionerStatusEnum.PROVISIONING.value,
+    )
+
+    knowledge_bases: Mapped[List["KnowledgeBase"]] = relationship(
+        back_populates="milvus_collections"
+    )
+
+
 class KnowledgeBase(Base, TimestampMixin):
     __tablename__ = "knowledge_bases"
 
     id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user_clients.id", onupdate="CASCADE", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    collection_id: Mapped[int] = mapped_column(
+        ForeignKey("milvus_collections.id", onupdate="CASCADE", ondelete="RESTRICT"),
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -164,6 +193,9 @@ class KnowledgeBase(Base, TimestampMixin):
     )
     ingestion_jobs: Mapped[List["IngestionJob"]] = relationship(
         back_populates="knowledge_base", cascade="all, delete-orphan"
+    )
+    milvus_collections: Mapped["MilvusCollections"] = relationship(
+        back_populates="milvus_collections"
     )
 
     __table_args__ = (

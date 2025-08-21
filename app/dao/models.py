@@ -134,6 +134,7 @@ class ListDocuments(StandardResponse):
 class CreateKbInDb(BaseModel):
     user_id: int
     name: str
+    category: str
 
 
 class CreateKbReq(BaseModel):

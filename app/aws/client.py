@@ -65,9 +65,17 @@ class AwsClientManager:
     ):
         self.settings = settings
         self.session_kwargs = {"region_name": self.settings.AWS_REGION}
-        self.kms_key_id = settings.AWS_KMS_KEY_ID
 
-        if self.settings.AWS_ACCESS_KEY_ID and self.settings.AWS_SECRET_ACCESS_KEY:
+        if self.settings.is_production:
+            self.kms_key_id = settings.AWS_KMS_KEY_ID
+        else:
+            self.kms_key_id = None
+
+        if (
+            self.settings.is_development
+            and self.settings.AWS_ACCESS_KEY_ID
+            and self.settings.AWS_SECRET_ACCESS_KEY
+        ):
             logger.info("use static aws credentials for development")
             self.session_kwargs["aws_access_key_id"] = self.settings.AWS_ACCESS_KEY_ID
             self.session_kwargs["aws_secret_access_key"] = (
@@ -83,6 +91,9 @@ class AwsClientManager:
 
     @property
     def kms(self):
+        if not self.settings.is_production:
+            return None
+        
         if self._kms_client is None:
             self._kms_client = self.session.client("kms")
         return self._kms_client
@@ -102,8 +113,8 @@ class AwsClientManager:
         return self._sqs_client
 
     def encrypt_key(self, key_blob: bytes) -> Optional[bytes]:
-        if not self.kms or not self.kms_key_id:
-            logger.error("kms client or kms key id not configured for encryption")
+        if not self.kms:
+            logger.error("KMS based encryption is not available in non-production environments")
             return None
         try:
             response = self.kms.encrypt(
@@ -115,8 +126,8 @@ class AwsClientManager:
             raise
 
     def decrypt_key(self, ciphertext_blob: bytes) -> Optional[bytes]:
-        if not self.kms or not self.kms_key_id:
-            logger.error("kms client or kms key id not configured for encryption")
+        if not self.kms:
+            logger.error("KMS based decryption is not available in non-production environments")
             return None
         try:
             response = self.kms.decrypt(

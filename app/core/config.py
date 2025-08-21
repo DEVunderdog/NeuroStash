@@ -2,7 +2,13 @@ from pydantic import PostgresDsn, computed_field, EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_core import MultiHostUrl
 from typing import Optional
+from enum import Enum
 import os
+
+
+class Environment(str, Enum):
+    DEVELOPMENT = "dev"
+    PRODUCTION = "prod"
 
 
 class Settings(BaseSettings):
@@ -11,6 +17,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
+
+    @property
+    def is_development(self) -> bool:
+        return self.ENVIRONMENT == Environment.DEVELOPMENT
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT == Environment.PRODUCTION
 
     PROJECT_NAME: str
     API_V1: str = "/api/v1"
@@ -34,7 +50,7 @@ class Settings(BaseSettings):
         )
 
     AWS_REGION: str
-    AWS_KMS_KEY_ID: str
+    AWS_KMS_KEY_ID: Optional[str]
     AWS_ACCESS_KEY_ID: Optional[str]
     AWS_SECRET_ACCESS_KEY: Optional[str]
     AWS_BUCKET_NAME: str
@@ -57,5 +73,10 @@ class Settings(BaseSettings):
     FIRST_ADMIN: EmailStr
 
     OPENAI_KEY: str
+
+    MILVUS_URL: str
+    MILVUS_USER: str
+    MILVUS_PASSWORD: str
+
 
 settings = Settings()

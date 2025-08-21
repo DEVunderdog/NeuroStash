@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.api.deps import SessionDep, TokenPayloadDep
+from app.api.deps import SessionDep, TokenPayloadDep, ProvisionDep
 from app.dao.knowledge_base_dao import (
     KnowledgeBaseAlreadyExists,
     create_kb_db,
@@ -104,7 +104,9 @@ def list_knowledge_base_docs(
     status_code=status.HTTP_200_OK,
     summary="delete knowledge base",
 )
-def delete_kb(db: SessionDep, payload: TokenPayloadDep, kb_id: int):
+def delete_kb(
+    db: SessionDep, payload: TokenPayloadDep, provisioner: ProvisionDep, kb_id: int
+):
     if kb_id == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -112,6 +114,9 @@ def delete_kb(db: SessionDep, payload: TokenPayloadDep, kb_id: int):
         )
     try:
         result = delete_kb_db(db=db, user_id=payload.user_id, kb_id=kb_id)
+
+        provisioner.trigger_reconcilation()
+        
         if result:
             return StandardResponse(message="successfully deleted")
         else:

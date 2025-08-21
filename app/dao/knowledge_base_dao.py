@@ -1,12 +1,14 @@
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select, delete, func
+from sqlalchemy.exc import IntegrityError, NoResultFound
+from sqlalchemy import select, func
 from app.dao.models import CreateKbInDb, ListKbDocs, KbDoc
 from app.dao.schema import (
     KnowledgeBase,
     DocumentRegistry,
     KnowledgeBaseDocument,
     OperationStatusEnum,
+    MilvusCollections,
+    ProvisionerStatusEnum,
 )
 from typing import List, Tuple
 import psycopg
@@ -20,17 +22,43 @@ class KnowledgeBaseAlreadyExists(Exception):
 
 def create_kb_db(*, db: Session, kb: CreateKbInDb) -> KnowledgeBase:
     try:
-        knowledge_base = KnowledgeBase(**kb.model_dump())
-        db.add(knowledge_base)
-        db.commit()
+        with db.begin_nested():
+            stmt = (
+                select(MilvusCollections)
+                .where(MilvusCollections.status == ProvisionerStatusEnum.AVAILABLE)
+                .order_by(func.random())
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            )
+
+            available_collection = db.execute(stmt).scalar_one()
+
+            available_collection.status = ProvisionerStatusEnum.ASSIGNED
+
+            knowledge_base = KnowledgeBase(
+                user_id=kb.user_id,
+                name=kb.name,
+                collection_id=available_collection.id,
+                category=kb.category,
+                milvus_collections=available_collection,
+            )
+
+            db.add(knowledge_base)
+
         db.refresh(knowledge_base)
         return knowledge_base
+
+    except NoResultFound:
+        db.rollback()
+        raise RuntimeError("no available milvus collection found.")
+
     except IntegrityError as e:
         db.rollback()
         if isinstance(e.orig, psycopg.errors.UniqueViolation):
             raise KnowledgeBaseAlreadyExists(knowledg_base_name=kb.name)
         else:
             raise RuntimeError(f"database integrity error: {e}")
+
     except Exception as e:
         db.rollback()
         raise RuntimeError(f"failed to create knowledge base in database: {e}")
@@ -72,7 +100,7 @@ def list_kb_docs(
             DocumentRegistry.op_status == OperationStatusEnum.SUCCESS,
             DocumentRegistry.lock_status == False,
             KnowledgeBaseDocument.knowledge_base_id == kb_id,
-            KnowledgeBaseDocument.status == OperationStatusEnum.SUCCESS
+            KnowledgeBaseDocument.status == OperationStatusEnum.SUCCESS,
         )
     )
 
@@ -100,12 +128,20 @@ def list_kb_docs(
 
 def delete_kb_db(*, db: Session, user_id: int, kb_id: int) -> bool:
     try:
-        stmt = delete(KnowledgeBase).where(
-            KnowledgeBase.id == kb_id, KnowledgeBase.user_id == user_id
-        )
-        result = db.execute(stmt)
-        db.commit()
-        return result.rowcount > 0
+        with db.begin_nested():
+            stmt = select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
+            kb = db.execute(stmt).scalar_one()
+            if kb.milvus_collections:
+                kb.milvus_collections.status = ProvisionerStatusEnum.CLEANUP
+            else:
+                raise RuntimeError(
+                    f"inconsistent state: KnowledgeBase {kb_id} has no associated milvus collections"
+                )
+            db.delete(kb)
+        return True
+    except NoResultFound:
+        db.rollback()
+        raise RuntimeError("none knowledge base found with that id")
     except Exception:
         db.rollback()
         raise

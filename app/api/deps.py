@@ -8,6 +8,7 @@ from app.aws.client import AwsClientManager
 from app.token_svc.token_manager import TokenManager, KeyNotFoundError
 from app.token_svc.token_models import TokenData, ApiData
 from jose import JWTError, ExpiredSignatureError
+from app.provisioner.manager import ProvisionManager
 from app.dao.api_keys_dao import get_api_key_for_verification
 
 oauth2_scheme = HTTPBearer(auto_error=False)
@@ -40,9 +41,16 @@ def get_token_manager(request: Request) -> TokenManager:
     return request.app.state.token_manager
 
 
+def get_provision_manager(request: Request) -> ProvisionManager:
+    if not hasattr(request.app.state, "provision_manager"):
+        raise RuntimeError("ProvisionManager not initialized. Check lifespan events")
+    return request.app.state.provision_manager
+
+
 SessionDep = Annotated[Session, Depends(get_db)]
 TokenDep = Annotated[TokenManager, Depends(get_token_manager)]
 AwsDep = Annotated[AwsClientManager, Depends(get_aws_client_manager)]
+ProvisionDep = Annotated[ProvisionManager, Depends(get_provision_manager)]
 
 
 async def get_token_payload(

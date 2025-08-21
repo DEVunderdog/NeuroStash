@@ -4,7 +4,7 @@ from app.token_svc.token_models import (
     KeyInfo,
     TokenData,
 )
-from app.core.config import settings
+from app.core.config import Settings
 from datetime import timedelta, datetime, timezone
 from jose import JWTError, jwt
 from jose.constants import ALGORITHMS
@@ -28,9 +28,11 @@ logger = logging.getLogger(__name__)
 class KeyNotFoundError(Exception):
     pass
 
+
 class TokenManager:
     def __init__(
         self,
+        settings: Settings,
         initial_db_session: Session,
         aws_client_manager: AwsClientManager,
     ):
@@ -38,6 +40,7 @@ class TokenManager:
         self._active_key_config: Tuple[Dict[int, KeyInfo], int] = (
             self._build_active_key_tuple(db=initial_db_session)
         )
+        self.settings = settings
 
     def _build_active_key_tuple(self, db: Session) -> Tuple[Dict[int, KeyInfo], int]:
         active_encryption_keys = get_active_encryption_key(db=db)
@@ -47,12 +50,18 @@ class TokenManager:
         decrypted_key_info: Dict[int, KeyInfo] = {}
         if active_encryption_keys is None:
             symmetric_key = generate_symmetric_key()
-            cipher_key = self._aws_client_manager.encrypt_key(key_blob=symmetric_key)
-            if cipher_key is None:
-                logger.error("cipher key is None")
-                raise RuntimeError("error encrypting keys")
-            active_id = create_encryption_key(db=db, symmetric_key=cipher_key)
-            key_info[active_id] = KeyInfo(key=cipher_key)
+            if self.settings.is_production:
+                cipher_key = self._aws_client_manager.encrypt_key(
+                    key_blob=symmetric_key
+                )
+                if cipher_key is None:
+                    logger.error("cipher key is None")
+                    raise RuntimeError("error encrypting keys")
+                active_id = create_encryption_key(db=db, symmetric_key=cipher_key)
+                key_info[active_id] = KeyInfo(key=cipher_key)
+            else:
+                active_id = create_encryption_key(db=db, symmetric_key=symmetric_key)
+                key_info[active_id] = KeyInfo(key=symmetric_key)
         else:
             active_id = active_encryption_keys.id
             key_info[active_id] = KeyInfo(
@@ -67,13 +76,20 @@ class TokenManager:
                 )
 
         for key_id_iter, value in key_info.items():
-            decrypted_key_bytes = self._aws_client_manager.decrypt_key(value.key)
-            if not decrypted_key_bytes:
-                logger.error(f"failed to decrypt symmetric key id {key_id_iter}")
-                raise RuntimeError(f"failed to decrypt symmetric key id {key_id_iter}")
-            decrypted_key_info[key_id_iter] = KeyInfo(
-                key=decrypted_key_bytes, expires_at=value.expires_at
-            )
+            if self.settings.is_production:
+                decrypted_key_bytes = self._aws_client_manager.decrypt_key(value.key)
+                if not decrypted_key_bytes:
+                    logger.error(f"failed to decrypt symmetric key id {key_id_iter}")
+                    raise RuntimeError(
+                        f"failed to decrypt symmetric key id {key_id_iter}"
+                    )
+                decrypted_key_info[key_id_iter] = KeyInfo(
+                    key=decrypted_key_bytes, expires_at=value.expires_at
+                )
+            else:
+                decrypted_key_info[key_id_iter] = KeyInfo(
+                    key=value.key, expires_at=value.expires_at
+                )
 
         return (decrypted_key_info, active_id)
 
@@ -93,19 +109,19 @@ class TokenManager:
         if active_key_info.is_expired():
             raise RuntimeError("active key has expired")
 
-        to_encode = payload_data.model_dump(mode='json', exclude_unset=True)
+        to_encode = payload_data.model_dump(mode="json", exclude_unset=True)
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
             expire = datetime.now(timezone.utc) + timedelta(
-                hours=settings.JWT_ACCESS_TOKEN_HOURS
+                hours=self.settings.JWT_ACCESS_TOKEN_HOURS
             )
 
         to_encode.update(
             {
                 "exp": expire,
-                "iss": settings.JWT_ISSUER,
-                "aud": settings.JWT_AUDIENCE,
+                "iss": self.settings.JWT_ISSUER,
+                "aud": self.settings.JWT_AUDIENCE,
                 "iat": datetime.now(timezone.utc),
                 "jti": os.urandom(16).hex(),
             }
@@ -142,8 +158,8 @@ class TokenManager:
                 token=token,
                 key=key_for_verification.key.hex(),
                 algorithms=[ALGORITHMS.HS256],
-                audience=settings.JWT_AUDIENCE,
-                issuer=settings.JWT_ISSUER,
+                audience=self.settings.JWT_AUDIENCE,
+                issuer=self.settings.JWT_ISSUER,
                 options={"verify_aud": True, "verify_iss": True, "verify_exp": True},
             )
             return TokenData(**payload)
