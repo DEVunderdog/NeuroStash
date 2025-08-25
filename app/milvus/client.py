@@ -1,7 +1,9 @@
 from pymilvus import MilvusClient, DataType, Function, FunctionType
 from app.core.config import Settings
 from app.constants.globals import MODEL_DIMENSION
+from app.milvus.entity import CollectionSchemaEntity, auto_generated_fields
 from typing import List
+from dataclasses import asdict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -46,9 +48,10 @@ class MilvusOps:
             schema = self.client.create_schema()
             schema.add_field(
                 field_name="id",
-                datatype=DataType.INT64,
+                datatype=DataType.VARCHAR,
+                max_length=36,
                 is_primary=True,
-                auto_id=True,
+                auto_id=False,
             )
             schema.add_field(
                 field_name="text_dense_vector",
@@ -151,4 +154,35 @@ class MilvusOps:
             self.client.drop_collection(collection_name=collection_name)
         except Exception:
             logger.error("error dropping collection", exc_info=True)
+            raise
+
+    def upsert_into_collection(
+        self, collection_name: str, data: List[CollectionSchemaEntity]
+    ):
+        data_to_upsert = []
+        for entity in data:
+            entity_dict = asdict(entity)
+
+            cleaned_dict = {
+                key: value
+                for key, value in entity_dict.items()
+                if key not in auto_generated_fields
+            }
+            data_to_upsert.append(cleaned_dict)
+
+        try:
+            self.client.upsert(collection_name=collection_name, data=data_to_upsert)
+            logger.info("successfully inserted the data into collection")
+        except Exception as e:
+            logger.error(f"error inserting data into collection: {e}", exc_info=e)
+            raise
+
+    def delete_entities_record(self, collection_name: str, filter: str):
+        try:
+            self.client.delete(collection_name=collection_name, filter=filter)
+            logger.info("successfully processed deletion of entities collection record")
+        except Exception as e:
+            logger.error(
+                f"error deleting entities collection record: {e}", exc_info=True
+            )
             raise

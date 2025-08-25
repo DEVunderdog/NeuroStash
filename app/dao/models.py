@@ -165,11 +165,20 @@ class ListedKb(StandardResponse):
         from_attributes = True
 
 
+class FilesForIngestion(BaseModel):
+    kb_doc_id: int
+    file_name: int
+    object_key: Optional[str] = None
+
+
 class SqsMessage(BaseModel):
     ingestion_job_id: int
     job_resource_id: str
-    new_kb_doc_id: Optional[List[int]] = None
-    new_object_keys: Optional[List[str]] = None
+    index_kb_doc_id: Optional[List[FilesForIngestion]] = None
+    delete_kb_doc_id: Optional[List[FilesForIngestion]] = None
+    collection_name: str
+    category: str
+    user_id: int
 
 
 class ReceivedSqsMessage(BaseModel):
