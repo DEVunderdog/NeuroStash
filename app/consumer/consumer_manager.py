@@ -2,16 +2,24 @@ import logging
 import asyncio
 from app.aws.client import AwsClientManager
 from app.core.config import Settings
+from sqlalchemy.orm import Session
+from app.processor.processor_manager import ProcessorManager
 
 logger = logging.getLogger(__name__)
 
 
 class ConsumerManager:
-    def __init__(self, aws_client_manager: AwsClientManager, settings: Settings):
+    def __init__(
+        self, db: Session, aws_client_manager: AwsClientManager, settings: Settings
+    ):
         self.aws_client_manager = aws_client_manager
         self.settings = settings
         self.is_running = False
         self.consumer_task = None
+        self.db = db
+        self.process_manager = ProcessorManager(
+            aws_client_manager=aws_client_manager, settings=settings, db=db
+        )
 
     async def start(self):
         if self.is_running:
@@ -43,7 +51,7 @@ class ConsumerManager:
                 if messages:
                     for message in messages:
                         logger.info(f"message: {message}")
-                        # process message via process manager
+                        self.process_manager.process_message(message=message)
                         try:
                             await self._delete_message(message.receipt_handle)
                             logger.info(f"delete message: {message.message_id}")

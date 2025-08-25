@@ -78,9 +78,11 @@ async def lifespan(app: FastAPI):
     )
 
     app.consumer_manager = ConsumerManager(
-        aws_client_manager=app.state.aws_client_manager, settings=settings
+        aws_client_manager=app.state.aws_client_manager,
+        settings=settings,
+        db=db_session,
     )
-    
+
     await app.state.consumer_manager.start()
 
     yield

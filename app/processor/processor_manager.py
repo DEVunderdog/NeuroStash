@@ -9,7 +9,7 @@ from app.processor.ingest_data import IngestData
 from langchain_openai import OpenAIEmbeddings
 from app.constants.models import OPENAI_EMBEDDINGS_MODEL
 from typing import List, Tuple
-from app.dao.schema import OperationStatusEnum, KnowledgeBaseDocument
+from app.dao.schema import OperationStatusEnum, KnowledgeBaseDocument, IngestionJob
 import itertools
 from sqlalchemy import update, case
 
@@ -101,7 +101,7 @@ class ProcessorManager:
             )
             raise
 
-    def process_message(self, message: ReceivedSqsMessage, db: Session):
+    def process_message(self, message: ReceivedSqsMessage):
         logger.info("initiating processing message")
         try:
             all_results = asyncio.run(self._process_tasks_concurrently(message=message))
@@ -121,10 +121,24 @@ class ProcessorManager:
             if processed_items:
                 self._bulk_update_document_statuses(results=processed_items)
 
+            stmt = (
+                update(IngestionJob)
+                .where(IngestionJob.id == message.body.ingestion_job_id)
+                .values(op_status=OperationStatusEnum.SUCCESS)
+            )
+
+            self.db.execute(stmt)
             self.db.commit()
             logger.info("database updates committed successfully")
         except Exception as e:
             logger.error(
                 f"an unexpected error occurred in process_message: {e}", exc_info=True
             )
+            stmt = (
+                update(IngestionJob)
+                .where(IngestionJob.id == message.body.ingestion_job_id)
+                .values(op_status=OperationStatusEnum.FAILED)
+            )
+            self.db.execute(stmt)
+            self.db.commit()
             raise
