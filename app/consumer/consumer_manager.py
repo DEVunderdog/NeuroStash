@@ -4,6 +4,7 @@ from app.aws.client import AwsClientManager
 from app.core.config import Settings
 from sqlalchemy.orm import Session
 from app.processor.processor_manager import ProcessorManager
+from app.dao.models import ReceivedSqsMessage
 
 logger = logging.getLogger(__name__)
 
@@ -43,25 +44,41 @@ class ConsumerManager:
 
         self.consumer_task.add_done_callback(task_done_callback)
 
+    async def _process_and_delete_message(self, message: ReceivedSqsMessage):
+        try:
+            logger.info(f"processing message: {message.message_id}")
+
+            await asyncio.to_thread(
+                self.process_manager.process_message, message=message
+            )
+
+            await self._delete_message(message.receipt_handle)
+
+            logger.info(
+                f"successfully processed and deleted message: {message.message_id}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"failed to process messgae {message.message_id}, it will not be deleted",
+                exc_info=e,
+            )
+
     async def _consumer_loop(self):
         while self.is_running:
             try:
                 messages = await self._receive_message()
-                logger.info(f"received: {len(messages)} messages from SQS")
                 if messages:
-                    for message in messages:
-                        logger.info(f"message: {message}")
-                        self.process_manager.process_message(message=message)
-                        try:
-                            await self._delete_message(message.receipt_handle)
-                            logger.info(f"delete message: {message.message_id}")
-                        except Exception as e:
-                            logger.error(
-                                "failed to delete message",
-                                extra={"error": str(e)},
-                                exc_info=True,
-                            )
-                            raise
+                    logger.info(f"received: {len(messages)} messages from SQS")
+
+                    processing_tasks = [
+                        self._process_and_delete_message(message)
+                        for message in messages
+                    ]
+                    await asyncio.gather(*processing_tasks)
+                else:
+                    await asyncio.sleep(1)
+                
             except asyncio.CancelledError:
                 logger.info("manager cancelled the consumer")
                 break
@@ -71,7 +88,8 @@ class ConsumerManager:
                     extra={"error": str(e)},
                     exc_info=True,
                 )
-                raise
+                
+        logger.info("consumer loop has stopped.")
 
     async def _receive_message(self):
         return await asyncio.to_thread(self.aws_client_manager.receive_sqs_message)

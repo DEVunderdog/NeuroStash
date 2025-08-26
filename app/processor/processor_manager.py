@@ -15,10 +15,8 @@ from sqlalchemy import update, case
 
 logger = logging.getLogger(__name__)
 
-
 class InvalidFileExtension(Exception):
     pass
-
 
 class ProcessorManager:
     def __init__(
@@ -103,21 +101,24 @@ class ProcessorManager:
 
     def process_message(self, message: ReceivedSqsMessage):
         logger.info("initiating processing message")
+
+        all_results = asyncio.run(self._process_tasks_concurrently(message=message))
+        logger.info("indexing and reindexing is completed")
+
+        processed_items = itertools.chain.from_iterable(
+            response for response in all_results if isinstance(response, list)
+        )
+
+        exceptions = [res for res in all_results if isinstance(res, Exception)]
+
+        if exceptions:
+            for exc in exceptions:
+                logger.error(
+                    f"An exception occurred during concurrent execution: {exc}",
+                    exc_info=exc,
+                )
+
         try:
-            all_results = asyncio.run(self._process_tasks_concurrently(message=message))
-            logger.info("indexing and reindexing is completed")
-
-            processed_items = itertools.chain.from_iterable(
-                response for response in all_results if isinstance(response, list)
-            )
-
-            exceptions = [res for res in all_results if isinstance(res, Exception)]
-            if exceptions:
-                for exc in exceptions:
-                    logger.error(
-                        f"An exception occurred during concurrent execution: {exc}",
-                        exc_info=exc,
-                    )
             if processed_items:
                 self._bulk_update_document_statuses(results=processed_items)
 
@@ -134,11 +135,22 @@ class ProcessorManager:
             logger.error(
                 f"an unexpected error occurred in process_message: {e}", exc_info=True
             )
-            stmt = (
-                update(IngestionJob)
-                .where(IngestionJob.id == message.body.ingestion_job_id)
-                .values(op_status=OperationStatusEnum.FAILED)
-            )
-            self.db.execute(stmt)
-            self.db.commit()
+            self.db.rollback()
+            try:
+                fail_stmt = (
+                    update(IngestionJob)
+                    .where(IngestionJob.id == message.body.ingestion_job_id)
+                    .values(op_status=OperationStatusEnum.FAILED)
+                )
+                self.db.execute(fail_stmt)
+                self.db.commit()
+                logger.warning(
+                    f"Successfully marked job {message.body.ingestion_job_id} as FAILED after transaction failure."
+                )
+            except Exception as final_update_exc:
+                logger.critical(
+                    f"CRITICAL: Could not even mark job {message.body.ingestion_job_id} as FAILED. Manual intervention required. Error: {final_update_exc}",
+                    exc_info=True,
+                )
+                self.db.rollback()
             raise

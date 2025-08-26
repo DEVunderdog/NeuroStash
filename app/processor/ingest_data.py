@@ -198,21 +198,25 @@ class IngestData:
         embedding_model: OpenAIEmbeddings,
         batch_size: int = 2048,
     ) -> List[List[float]]:
-        document_texts = [doc.page_content for doc in documents]
+        try:
+            document_texts = [doc.page_content for doc in documents]
 
-        text_batches = [
-            document_texts[i : i + batch_size]
-            for i in range(0, len(document_texts), batch_size)
-        ]
+            text_batches = [
+                document_texts[i : i + batch_size]
+                for i in range(0, len(document_texts), batch_size)
+            ]
 
-        tasks = [embedding_model.aembed_documents(batch) for batch in text_batches]
-        batch_embeddings = await asyncio.gather(*tasks)
+            tasks = [embedding_model.aembed_documents(batch) for batch in text_batches]
+            batch_embeddings = await asyncio.gather(*tasks)
 
-        all_embeddings = [
-            embedding for batch in batch_embeddings for embedding in batch
-        ]
+            all_embeddings = [
+                embedding for batch in batch_embeddings for embedding in batch
+            ]
 
-        return all_embeddings
+            return all_embeddings
+        except Exception as e:
+            logger.error(f"error calculating embeddings: {e}", exc_info=True)
+            raise
 
     async def _upsert_into_milvus(
         self, file: FilesForIngestion, user_id: int, category: int, collection_name: str

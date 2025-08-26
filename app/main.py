@@ -88,6 +88,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("application is shutting down")
+
     if hasattr(app.state, "consumer_manager"):
         await app.state.consumer_manager.stop()
 
