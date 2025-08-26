@@ -12,15 +12,22 @@ from typing import List, Tuple
 from app.dao.schema import OperationStatusEnum, KnowledgeBaseDocument, IngestionJob
 import itertools
 from sqlalchemy import update, case
+from app.milvus.client import MilvusOps
 
 logger = logging.getLogger(__name__)
+
 
 class InvalidFileExtension(Exception):
     pass
 
+
 class ProcessorManager:
     def __init__(
-        self, aws_client_manager: AwsClientManager, settings: Settings, db: Session
+        self,
+        aws_client_manager: AwsClientManager,
+        settings: Settings,
+        db: Session,
+        milvus_ops: MilvusOps,
     ):
         self.aws_client_manager: AwsClientManager = aws_client_manager
         self.settings: Settings = settings
@@ -35,7 +42,7 @@ class ProcessorManager:
             embeddings=self.embeddings,
             aws_client_manager=self.aws_client_manager,
             semantic_chunker=self.semantic_chunker,
-            settings=settings,
+            milvus_ops=milvus_ops,
         )
 
     async def _process_tasks_concurrently(

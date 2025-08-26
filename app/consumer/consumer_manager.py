@@ -5,13 +5,18 @@ from app.core.config import Settings
 from sqlalchemy.orm import Session
 from app.processor.processor_manager import ProcessorManager
 from app.dao.models import ReceivedSqsMessage
+from app.milvus.client import MilvusOps
 
 logger = logging.getLogger(__name__)
 
 
 class ConsumerManager:
     def __init__(
-        self, db: Session, aws_client_manager: AwsClientManager, settings: Settings
+        self,
+        db: Session,
+        aws_client_manager: AwsClientManager,
+        settings: Settings,
+        milvus_ops: MilvusOps,
     ):
         self.aws_client_manager = aws_client_manager
         self.settings = settings
@@ -19,7 +24,10 @@ class ConsumerManager:
         self.consumer_task = None
         self.db = db
         self.process_manager = ProcessorManager(
-            aws_client_manager=aws_client_manager, settings=settings, db=db
+            aws_client_manager=aws_client_manager,
+            settings=settings,
+            db=db,
+            milvus_ops=milvus_ops,
         )
 
     async def start(self):
@@ -78,7 +86,7 @@ class ConsumerManager:
                     await asyncio.gather(*processing_tasks)
                 else:
                     await asyncio.sleep(1)
-                
+
             except asyncio.CancelledError:
                 logger.info("manager cancelled the consumer")
                 break
@@ -88,7 +96,7 @@ class ConsumerManager:
                     extra={"error": str(e)},
                     exc_info=True,
                 )
-                
+
         logger.info("consumer loop has stopped.")
 
     async def _receive_message(self):

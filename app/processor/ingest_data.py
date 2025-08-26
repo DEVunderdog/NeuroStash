@@ -17,7 +17,6 @@ from app.constants.globals import MAX_CONCURRENT_PROVISIONER
 from app.dao.schema import (
     OperationStatusEnum,
 )
-from app.core.config import Settings
 from app.utils.deterministic_id import generate_deterministic_uuid
 
 logger = logging.getLogger(__name__)
@@ -41,11 +40,11 @@ class IngestData:
         embeddings: OpenAIEmbeddings,
         aws_client_manager: AwsClientManager,
         semantic_chunker: CustomSemanticChunker,
-        settings: Settings,
+        milvus_ops: MilvusOps,
     ):
         self.embeddings = embeddings
         self.aws_client = aws_client_manager
-        self.milvus_ops = MilvusOps(settings=settings)
+        self.milvus_ops = milvus_ops
         self.semantic_chunker = semantic_chunker
         self.max_concurrency = MAX_CONCURRENT_PROVISIONER
 

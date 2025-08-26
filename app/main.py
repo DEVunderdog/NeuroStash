@@ -35,20 +35,13 @@ logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-async def schedule_cleanup_job():
+async def schedule_cleanup_job(provision_manager: ProvisionManager):
     logger.info("scheduler starting 'cleanup_collections' job")
-    db_session: Session = SessionLocal()
     try:
-        milvus_ops = MilvusOps(settings=settings)
-        provision_manager = ProvisionManager(
-            session=db_session, milvusOps=milvus_ops, settings=settings
-        )
         await provision_manager.cleanup_collections()
         logger.info("scheduler finished 'cleanup_collections' job successfully.")
     except Exception as e:
         logger.error(f"scheduled 'cleanup_collections' job failed: {e}", exc_info=True)
-    finally:
-        db_session.close()
 
 
 @asynccontextmanager
@@ -68,7 +61,12 @@ async def lifespan(app: FastAPI):
     reconcilation_task = asyncio.create_task(provision_manager.reconcilation_worker())
 
     scheduler.add_job(
-        schedule_cleanup_job, "cron", hour=2, minute=0, name="daily_collection_cleanup"
+        schedule_cleanup_job,
+        "cron",
+        hour=2,
+        minute=0,
+        name="daily_collection_cleanup",
+        args=[provision_manager],
     )
     scheduler.start()
 
@@ -81,6 +79,7 @@ async def lifespan(app: FastAPI):
         aws_client_manager=app.state.aws_client_manager,
         settings=settings,
         db=db_session,
+        milvus_ops=app.state.milvus_ops,
     )
 
     await app.state.consumer_manager.start()
