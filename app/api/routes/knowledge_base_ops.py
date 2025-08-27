@@ -23,7 +23,6 @@ router = APIRouter(prefix="/kb", tags=["Knowledge Base"])
 
 logger = logging.getLogger(__name__)
 
-
 @router.post(
     "/create",
     response_model=CreatedKb,
@@ -31,11 +30,12 @@ logger = logging.getLogger(__name__)
     summary="creates a new knowledge base",
 )
 def create_knowledge_base(
-    req: CreateKbReq, db: SessionDep, token_payload: TokenPayloadDep
+    req: CreateKbReq, db: SessionDep, token_payload: TokenPayloadDep, provisioner: ProvisionDep
 ):
     try:
         args = CreateKbInDb(user_id=token_payload.user_id, name=req.name)
         created_kb = create_kb_db(db=db, kb=args)
+        provisioner.trigger_reconcilation()
         return CreatedKb(
             message="succcessfully created knowledge base",
             id=created_kb.id,

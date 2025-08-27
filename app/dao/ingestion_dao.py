@@ -1,30 +1,54 @@
 import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, update, union_all
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from app.dao.models import CreatedIngestionJob
+from app.dao.models import CreatedIngestionJob, FileForIngestion
 from app.dao.schema import (
     KnowledgeBaseDocument,
     OperationStatusEnum,
     IngestionJob,
     DocumentRegistry,
+    KnowledgeBase,
+    MilvusCollections,
 )
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
 
+class KnowledgeBaseNotFound(Exception):
+    pass
+
+
 def create_ingestion_job(
     *,
     db: Session,
     document_ids: List[int],
+    retry_kb_doc_ids: List[int],
     kb_id: int,
     job_resource_id: UUID,
-    user_id: int
+    user_id: int,
 ) -> CreatedIngestionJob:
     try:
-        stmt = (
+
+        kb_stmt = (
+            select(MilvusCollections.collection_name, KnowledgeBase.category)
+            .join(
+                MilvusCollections, KnowledgeBase.collection_id == MilvusCollections.id
+            )
+            .where(KnowledgeBase.id == kb_id)
+            .where(KnowledgeBase.user_id == user_id)
+        )
+
+        knowledge_base_result = db.execute(kb_stmt).first()
+
+        if knowledge_base_result is None:
+            raise KnowledgeBaseNotFound(
+                f"KnowledgeBase with id={kb_id} and user_id={user_id} not found."
+            )
+
+        ingestion_job_id = db.execute(
             insert(IngestionJob)
             .values(
                 kb_id=kb_id,
@@ -32,93 +56,83 @@ def create_ingestion_job(
                 op_status=OperationStatusEnum.PENDING,
             )
             .returning(IngestionJob.id)
-        )
+        ).scalar_one()
 
-        result = db.execute(stmt)
-        ingestion_job_id = result.scalar()
+        document_detail_queries = []
 
-        if ingestion_job_id is None:
-            raise SQLAlchemyError("failed to create ingestion job")
-
-        existing_stmt = select(
-            KnowledgeBaseDocument.id, KnowledgeBaseDocument.document_id
-        ).where(
-            KnowledgeBaseDocument.knowledge_base_id == kb_id,
-            KnowledgeBaseDocument.document_id.in_(document_ids),
-            KnowledgeBaseDocument.status == OperationStatusEnum.SUCCESS
-        )
-
-        existing_result = db.execute(existing_stmt).all()
-        existing_map = {doc_id: kb_doc_id for kb_doc_id, doc_id in existing_result}
-        existing_doc_ids = set(existing_map.keys())
-
-        new_doc_ids = [
-            doc_id for doc_id in document_ids if doc_id not in existing_doc_ids
-        ]
-        conflicted_doc_ids = [
-            doc_id for doc_id in document_ids if doc_id in existing_doc_ids
-        ]
-
-        new_object_keys_stmt = select(DocumentRegistry.object_key).where(
-            DocumentRegistry.id.in_(new_doc_ids), DocumentRegistry.user_id == user_id
-        )
-        new_object_keys_result = db.execute(new_object_keys_stmt)
-        object_keys = new_object_keys_result.scalars().all()
-
-        inserted_ids = []
-
-        if new_doc_ids:
-            data_to_insert = [
+        if document_ids:
+            documents_to_insert = [
                 {
                     "knowledge_base_id": kb_id,
                     "document_id": doc_id,
                     "status": OperationStatusEnum.PENDING,
                 }
-                for doc_id in new_doc_ids
+                for doc_id in document_ids
             ]
-            stmt = (
+
+            insert_stmt = (
                 insert(KnowledgeBaseDocument)
-                .values(data_to_insert)
-                .returning(KnowledgeBaseDocument.id)
-            )
-            insert_result = db.execute(stmt)
-            inserted_ids = insert_result.scalars().all()
+                .values(documents_to_insert)
+                .returning(KnowledgeBaseDocument.id, KnowledgeBaseDocument.document_id)
+            ).cte("inserted_cte")
 
-        conflicted_kb_doc_ids = [existing_map[doc_id] for doc_id in conflicted_doc_ids]
+            select_inserted_stmt = select(
+                insert_stmt.c.id,
+                DocumentRegistry.file_name,
+                DocumentRegistry.object_key,
+            ).join(DocumentRegistry, insert_stmt.c.document_id == DocumentRegistry.id)
 
-        db.commit()
+            document_detail_queries.append(select_inserted_stmt)
+
+        if retry_kb_doc_ids:
+            update_stmt = (
+                update(KnowledgeBaseDocument)
+                .where(KnowledgeBaseDocument.id.in_(retry_kb_doc_ids))
+                .values(status=OperationStatusEnum.PENDING)
+                .returning(KnowledgeBaseDocument.id, KnowledgeBaseDocument.document_id)
+            ).cte("updated_cte")
+
+            select_update_stmt = select(
+                update_stmt.c.id,
+                DocumentRegistry.file_name,
+                DocumentRegistry.object_key,
+            ).join(DocumentRegistry, update_stmt.c.document_id == DocumentRegistry.id)
+            document_detail_queries.append(select_update_stmt)
+
+        ingested_documents: List[FileForIngestion] = []
+
+        if document_detail_queries:
+            final_select_stmt = union_all(*document_detail_queries)
+            results = db.execute(final_select_stmt).all()
+
+            ingested_documents = [
+                FileForIngestion(
+                    kb_doc_id=row.id, file_name=row.file_name, object_key=row.object_key
+                )
+                for row in results
+            ]
 
         return CreatedIngestionJob(
-            new_kb_documents=inserted_ids,
-            existing_kb_documents=conflicted_kb_doc_ids,
             ingestion_id=ingestion_job_id,
-            ingestion_resource_id=job_resource_id,
-            object_keys=object_keys,
+            ingestion_resource_id=str(job_resource_id),
+            collection_name=knowledge_base_result.collection_name,
+            category=knowledge_base_result.category,
+            user_id=user_id,
+            documents=ingested_documents,
         )
-    except SQLAlchemyError as e:
+
+    except (KnowledgeBaseNotFound, SQLAlchemyError) as e:
         db.rollback()
         logger.error(
-            "database error creating ingestion job",
-            extra={
-                "kb_id": kb_id,
-                "resource_id": str(job_resource_id),
-                "document_count": len(document_ids),
-                "error": str(e),
-            },
+            f"Error during ingestion job creation for kb_id={kb_id}: {e}",
             exc_info=True,
         )
         raise
+    
     except Exception as e:
         db.rollback()
         logger.error(
-            "Unexpected error creating ingestion job",
-            extra={
-                "kb_id": kb_id,
-                "resource_id": str(job_resource_id),
-                "document_count": len(document_ids),
-                "error": str(e),
-            },
+            f"Unexpected error during ingestion job creation for kb_id={kb_id}: {e}",
             exc_info=True,
         )
         raise
-

@@ -1,22 +1,22 @@
+import asyncio
 import logging
 import uuid
-import asyncio
 from pathlib import Path
+from typing import List, Sequence, Tuple
+
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
+
 from app.aws.client import AwsClientManager
-from app.milvus.client import MilvusOps
-from app.dao.models import FilesForIngestion
+from app.constants.globals import MAX_CONCURRENT_PROVISIONER
 from app.core.file_extension_validation import is_valid_file_extension
 from app.core.temp import get_system_temp_file_path
+from app.dao.models import FileForIngestion
+from app.dao.schema import OperationStatusEnum
+from app.milvus.client import MilvusOps
+from app.milvus.entity import CollectionSchemaEntity
 from app.processor.loaders import DocumentLoaderFactory
 from app.processor.semantic_chunker import CustomSemanticChunker
-from typing import Sequence, List, Tuple
-from langchain_core.documents import Document
-from app.milvus.entity import CollectionSchemaEntity
-from app.constants.globals import MAX_CONCURRENT_PROVISIONER
-from app.dao.schema import (
-    OperationStatusEnum,
-)
 from app.utils.deterministic_id import generate_deterministic_uuid
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class IngestData:
 
     async def index_data(
         self,
-        files: List[FilesForIngestion],
+        files: List[FileForIngestion],
         user_id: int,
         category: str,
         collection_name: str,
@@ -59,7 +59,7 @@ class IngestData:
         results = []
 
         async def indexing_with_limit(
-            file: FilesForIngestion, user_id: int, category: int, collection_name: str
+            file: FileForIngestion, user_id: int, category: int, collection_name: str
         ):
             async with semaphore:
                 try:
@@ -103,12 +103,12 @@ class IngestData:
         return results
 
     async def reindex_data(
-        self, files: List[FilesForIngestion], collection_name: str
+        self, files: List[FileForIngestion], collection_name: str
     ) -> List[Tuple[int, OperationStatusEnum]]:
         semaphore = asyncio.Semaphore(self.max_concurrency)
         results = []
 
-        async def reindexing_with_limit(file: FilesForIngestion, collection_name: str):
+        async def reindexing_with_limit(file: FileForIngestion, collection_name: str):
             async with semaphore:
                 try:
                     await self._process_reindexing(
@@ -167,7 +167,7 @@ class IngestData:
             raise
 
     async def _process_file(
-        self, file: FilesForIngestion
+        self, file: FileForIngestion
     ) -> Tuple[Sequence[Document], List[List[float]]]:
         try:
             temp_file = self._download_temp_file(object_key=file.object_key)
@@ -218,7 +218,7 @@ class IngestData:
             raise
 
     async def _upsert_into_milvus(
-        self, file: FilesForIngestion, user_id: int, category: int, collection_name: str
+        self, file: FileForIngestion, user_id: int, category: int, collection_name: str
     ):
         try:
             chunked_doc, embeddings = await self._process_file(file=file)
@@ -246,7 +246,7 @@ class IngestData:
             logger.error(f"error inserting into milvus: {e}", exc_info=True)
             raise
 
-    def _process_reindexing(self, file: FilesForIngestion, collection_name: str):
+    def _process_reindexing(self, file: FileForIngestion, collection_name: str):
         try:
             expr = f"file_id == {file.kb_doc_id}"
             self.milvus_ops.delete_entities_record(

@@ -1,18 +1,20 @@
-import logging
 import asyncio
-from app.aws.client import AwsClientManager
-from app.core.config import Settings
-from app.dao.models import ReceivedSqsMessage, FilesForIngestion
-from sqlalchemy.orm import Session
-from app.processor.semantic_chunker import CustomSemanticChunker
-from app.processor.ingest_data import IngestData
-from langchain_openai import OpenAIEmbeddings
-from app.constants.models import OPENAI_EMBEDDINGS_MODEL
-from typing import List, Tuple
-from app.dao.schema import OperationStatusEnum, KnowledgeBaseDocument, IngestionJob
 import itertools
-from sqlalchemy import update, case
+import logging
+from typing import List, Tuple
+
+from langchain_openai import OpenAIEmbeddings
+from sqlalchemy import case, update
+from sqlalchemy.orm import Session
+
+from app.aws.client import AwsClientManager
+from app.constants.models import OPENAI_EMBEDDINGS_MODEL
+from app.core.config import Settings
+from app.dao.models import FileForIngestion, ReceivedSqsMessage
+from app.dao.schema import IngestionJob, KnowledgeBaseDocument, OperationStatusEnum
 from app.milvus.client import MilvusOps
+from app.processor.ingest_data import IngestData
+from app.processor.semantic_chunker import CustomSemanticChunker
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,7 @@ class ProcessorManager:
         tasks = []
 
         if message.body.index_kb_doc_id and len(message.body.index_kb_doc_id):
-            index_files: List[FilesForIngestion] = message.body.index_kb_doc_id
+            index_files: List[FileForIngestion] = message.body.index_kb_doc_id
             indexing_task = asyncio.create_task(
                 self.ingest_data_ops.index_data(
                     files=index_files,
@@ -63,7 +65,7 @@ class ProcessorManager:
             tasks.append(indexing_task)
 
         if message.body.delete_kb_doc_id and len(message.body.delete_kb_doc_id):
-            delete_files: List[FilesForIngestion] = message.body.delete_kb_doc_id
+            delete_files: List[FileForIngestion] = message.body.delete_kb_doc_id
             reindexing_task = asyncio.create_task(
                 self.ingest_data_ops.reindex_data(
                     files=delete_files, collection_name=message.body.collection_name

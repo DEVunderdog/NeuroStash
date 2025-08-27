@@ -1,8 +1,10 @@
 import os
-from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
-from app.dao.schema import ClientRoleEnum
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
 from app.constants.content_type import ALLOWED_EXTENSIONS
+from app.dao.schema import ClientRoleEnum
 
 
 class StandardResponse(BaseModel):
@@ -135,6 +137,7 @@ class CreateKbInDb(BaseModel):
     user_id: int
     name: str
     category: str
+    collection_id: int
 
 
 class CreateKbReq(BaseModel):
@@ -165,7 +168,7 @@ class ListedKb(StandardResponse):
         from_attributes = True
 
 
-class FilesForIngestion(BaseModel):
+class FileForIngestion(BaseModel):
     kb_doc_id: int
     file_name: int
     object_key: Optional[str] = None
@@ -174,8 +177,8 @@ class FilesForIngestion(BaseModel):
 class SqsMessage(BaseModel):
     ingestion_job_id: int
     job_resource_id: str
-    index_kb_doc_id: Optional[List[FilesForIngestion]] = None
-    delete_kb_doc_id: Optional[List[FilesForIngestion]] = None
+    index_kb_doc_id: Optional[List[FileForIngestion]] = None
+    delete_kb_doc_id: Optional[List[FileForIngestion]] = None
     collection_name: str
     category: str
     user_id: int
@@ -192,17 +195,25 @@ class ReceivedSqsMessage(BaseModel):
 class IngestionRequest(BaseModel):
     kb_id: int
     file_ids: List[int]
+    retry_kb_doc_ids: List[int]
 
     class Config:
-        schema_extra = {"example": {"kb_id": 5, "file_ids": [1, 5, 6]}}
+        schema_extra = {
+            "example": {
+                "kb_id": 5,
+                "file_ids": [1, 5, 6],
+                "retry_kb_doc_ids": [1, 6, 9, 13],
+            }
+        }
 
 
 class CreatedIngestionJob(BaseModel):
     ingestion_id: int
     ingestion_resource_id: str
-    new_kb_documents: List[int]
-    object_keys: List[str]
-    existing_kb_documents: List[int]
+    collection_name: str
+    category: str
+    user_id: int
+    documents: List[FileForIngestion]
 
 
 class KbDoc(BaseModel):
@@ -213,5 +224,7 @@ class KbDoc(BaseModel):
 
 class ListKbDocs(StandardResponse):
     docs: List[KbDoc]
+    total_count: int
+    knowledge_base_id: int
     total_count: int
     knowledge_base_id: int
