@@ -17,6 +17,7 @@ from app.dao.schema import MilvusCollections, ProvisionerStatusEnum, KnowledgeBa
 
 logger = logging.getLogger(__name__)
 
+
 class ProvisionManager:
     def __init__(self, milvusOps: MilvusOps, settings: Settings):
         self.milvusOps = milvusOps

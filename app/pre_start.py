@@ -1,40 +1,55 @@
+import asyncio
 import logging
-from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session as SqlSession
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 from tenacity import after_log, before_log, retry, stop_after_attempt, wait_fixed
 from app.core.config import settings
+from app.provisioner.manager import ProvisionManager
+from app.milvus.client import MilvusOps
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-database_uri = str(settings.SQLALCHEMY_DATABASE_URI)
-engine = create_engine(url=database_uri, pool_pre_ping=True)
-
-max_tries = 60 * 5
-wait_seconds = 3
-
+MAX_TRIES = 60 * 5  # 5 minutes
+WAIT_SECONDS = 3
 
 @retry(
-    stop=stop_after_attempt(max_tries),
-    wait=wait_fixed(wait_seconds),
-    before=before_log(logger, logging.DEBUG),
-    after=after_log(logger, logging.INFO),
+    stop=stop_after_attempt(MAX_TRIES),
+    wait=wait_fixed(WAIT_SECONDS),
+    before=before_log(logger, logging.INFO),
+    after=after_log(logger, logging.WARNING),
+    reraise=True
 )
-def init(db_engine: Engine) -> None:
+async def check_db_ready() -> None:
     try:
-        with SqlSession(db_engine) as session:
-            session.execute(text("SELECT 1"))
-        logger.info("database connection successfully")
+        async_engine = create_async_engine(str(settings.SQLALCHEMY_DATABASE_URI), pool_pre_ping=True)
+        async with async_engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+        logger.info("Database connection successful.")
     except Exception as e:
-        logger.error(f"database connection/query failed: {e}")
+        logger.error(f"Database connection failed: {e}")
         raise
 
+async def prime_milvus_pool() -> None:
+    logger.info("Priming Milvus collection pool...")
+    try:
+        milvus_ops = MilvusOps(settings=settings)
+        provision_manager = ProvisionManager(milvusOps=milvus_ops, settings=settings)
+        await provision_manager.reconcile_collections()
+        logger.info("Successfully primed Milvus collection pool.")
+    except Exception as e:
+        logger.error(f"Failed to prime Milvus collection pool: {e}", exc_info=True)
+        raise
 
-def main() -> None:
-    logger.info("initializing service")
-    init(engine)
-    logger.info("service finished intializing")
-
+async def main() -> None:
+    logger.info("Initializing service...")
+    await check_db_ready()
+    await prime_milvus_pool()
+    logger.info("Service finished initializing.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        logger.critical(f"A critical error occurred during pre-start initialization: {e}")
+        exit(1)

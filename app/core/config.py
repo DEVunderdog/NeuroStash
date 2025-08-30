@@ -75,8 +75,8 @@ class Settings(BaseSettings):
     OPENAI_KEY: str
 
     MILVUS_URL: str
-    MILVUS_USER: str
-    MILVUS_PASSWORD: str
+    MILVUS_USER: Optional[str] = None
+    MILVUS_PASSWORD: Optional[str] = None
 
 
 settings = Settings()

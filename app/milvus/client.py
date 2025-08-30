@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 class MilvusOps:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.milvus_token = (
-            f"{self.settings.MILVUS_USER}:{self.settings.MILVUS_PASSWORD}"
-        )
-        self.client = MilvusClient(
-            uri=self.settings.MILVUS_URL, token=self.milvus_token
-        )
+        token = None
+
+        if self.settings.MILVUS_USER and self.settings.MILVUS_PASSWORD:
+            token = f"{self.settings.MILVUS_USER}:{self.settings.MILVUS_PASSWORD}"
+
+        self.client = MilvusClient(uri=self.settings.MILVUS_URL, token=token)
 
     def create_database(self, name: str):
         try:
