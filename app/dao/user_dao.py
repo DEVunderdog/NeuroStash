@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.dao.schema import UserClient, ApiKey, ClientRoleEnum
@@ -19,8 +19,8 @@ class UserAlreadyExistsError(Exception):
         super().__init__(f"user with email '{email}' already exists")
 
 
-def register_user(
-    *, db: Session, user: UserClientCreate, api_key_params: ApiKeyCreate
+async def register_user(
+    *, db: AsyncSession, user: UserClientCreate, api_key_params: ApiKeyCreate
 ) -> Tuple[UserClient, ApiKey]:
     try:
         user_client = UserClient(**user.model_dump())
@@ -32,34 +32,37 @@ def register_user(
             key_signature=api_key_params.key_signature,
         )
         db.add(api_key)
-        db.commit()
-        db.refresh(user_client)
-        db.refresh(api_key)
+        await db.commit()
+        await db.refresh(user_client)
+        await db.refresh(api_key)
         return user_client, api_key
     except IntegrityError as e:
-        db.rollback()
+        await db.rollback()
         if isinstance(e.orig, psycopg.errors.UniqueViolation):
             raise UserAlreadyExistsError(email=user.email) from e
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise RuntimeError(f"failed to register user due to an unexpected error: {e}")
 
 
-def get_user_db(*, db: Session, email: EmailStr) -> UserClient | None:
+async def get_user_db(*, db: AsyncSession, email: EmailStr) -> UserClient | None:
     stmt = select(UserClient).where(UserClient.email == email)
-    user = db.scalars(stmt).first()
-    return user
+    result = await db.execute(stmt)
+    return result.scalars().first()
 
 
-def list_users_db(*, db: Session, limit: int = 10, offset: int = 0) -> List[UserClient]:
+async def list_users_db(
+    *, db: AsyncSession, limit: int = 10, offset: int = 0
+) -> List[UserClient]:
     stmt = select(UserClient).order_by(UserClient.id).limit(limit).offset(offset)
-    users = db.scalars(stmt).all()
-    return users
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 
-def promote_user_db(*, db: Session, user_id: int) -> UserClient | None:
+async def promote_user_db(*, db: AsyncSession, user_id: int) -> UserClient | None:
     stmt = select(UserClient).where(UserClient.id == user_id)
-    user_client = db.scalars(stmt).first()
+    result = await db.execute(stmt)
+    user_client = result.scalars().first()
 
     if user_client:
         if user_client.role == ClientRoleEnum.ADMIN:
@@ -67,26 +70,27 @@ def promote_user_db(*, db: Session, user_id: int) -> UserClient | None:
 
         user_client.role = ClientRoleEnum.ADMIN
         try:
-            db.commit()
+            await db.commit()
             return user_client
         except Exception:
-            db.rollback()
+            await db.rollback()
             raise
     else:
         return None
 
 
-def delete_user_db(*, db: Session, user_id: int) -> bool:
+async def delete_user_db(*, db: AsyncSession, user_id: int) -> bool:
     stmt = select(UserClient).where(UserClient.id == user_id)
-    user_client = db.scalars(stmt).first()
+    result = await db.execute(stmt)
+    user_client = result.scalars().first()
 
     if user_client:
-        db.delete(user_client)
+        await db.delete(user_client)
         try:
-            db.commit()
+            await db.commit()
             return True
         except Exception:
-            db.rollback()
+            await db.rollback()
             raise
     else:
         return False

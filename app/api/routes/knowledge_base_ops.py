@@ -23,18 +23,22 @@ router = APIRouter(prefix="/kb", tags=["Knowledge Base"])
 
 logger = logging.getLogger(__name__)
 
+
 @router.post(
     "/create",
     response_model=CreatedKb,
     status_code=status.HTTP_201_CREATED,
     summary="creates a new knowledge base",
 )
-def create_knowledge_base(
-    req: CreateKbReq, db: SessionDep, token_payload: TokenPayloadDep, provisioner: ProvisionDep
+async def create_knowledge_base(
+    req: CreateKbReq,
+    db: SessionDep,
+    token_payload: TokenPayloadDep,
+    provisioner: ProvisionDep,
 ):
     try:
         args = CreateKbInDb(user_id=token_payload.user_id, name=req.name)
-        created_kb = create_kb_db(db=db, kb=args)
+        created_kb = await create_kb_db(db=db, kb=args)
         provisioner.trigger_reconcilation()
         return CreatedKb(
             message="succcessfully created knowledge base",
@@ -61,10 +65,10 @@ def create_knowledge_base(
     status_code=status.HTTP_200_OK,
     summary="list of knowledge bases",
 )
-def list_kb(
+async def list_kb(
     db: SessionDep, payload: TokenPayloadDep, limit: int = 100, offset: int = 0
 ):
-    listed_kb, total_count = list_users_kb(
+    listed_kb, total_count = await list_users_kb(
         db=db, limit=limit, offset=offset, user_id=payload.user_id
     )
     return ListedKb(
@@ -80,7 +84,7 @@ def list_kb(
     status_code=status.HTTP_200_OK,
     summary="list knowledge base documents",
 )
-def list_knowledge_base_docs(
+async def list_knowledge_base_docs(
     db: SessionDep,
     payload: TokenPayloadDep,
     kb_id: int,
@@ -92,7 +96,7 @@ def list_knowledge_base_docs(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="please provide knowledge base id to list knowledge base documents",
         )
-    result = list_kb_docs(
+    result = await list_kb_docs(
         db=db, limit=limit, offset=offset, user_id=payload.user_id, kb_id=kb_id
     )
     return result
@@ -104,7 +108,7 @@ def list_knowledge_base_docs(
     status_code=status.HTTP_200_OK,
     summary="delete knowledge base",
 )
-def delete_kb(
+async def delete_kb(
     db: SessionDep, payload: TokenPayloadDep, provisioner: ProvisionDep, kb_id: int
 ):
     if kb_id == 0:
@@ -113,10 +117,10 @@ def delete_kb(
             detail="please provide knowledge base id to delete",
         )
     try:
-        result = delete_kb_db(db=db, user_id=payload.user_id, kb_id=kb_id)
+        result = await delete_kb_db(db=db, user_id=payload.user_id, kb_id=kb_id)
 
-        provisioner.trigger_reconcilation()
-        
+        provisioner.trigger_cleanup()
+
         if result:
             return StandardResponse(message="successfully deleted")
         else:

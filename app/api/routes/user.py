@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
     status_code=status.HTTP_201_CREATED,
     summary="register a new user and provision an api key via mail by Admin",
 )
-def register_user_to_app(
+async def register_user_to_app(
     user_in: RegisterUser,
     db: SessionDep,
     token_manager: TokenDep,
@@ -67,7 +67,7 @@ def register_user_to_app(
             key_credential=api_key_bytes,
             key_signature=api_key_signature,
         )
-        db_user_client, db_api_key = register_user(
+        db_user_client, db_api_key = await register_user(
             db=db, user=user, api_key_params=api_key_params
         )
     except UserAlreadyExistsError:
@@ -91,7 +91,7 @@ def register_user_to_app(
     status_code=status.HTTP_200_OK,
     summary="list of users",
 )
-def list_users(
+async def list_users(
     admin_payload: TokenPayloadDep,
     db: SessionDep,
     limit: int = 10,
@@ -102,7 +102,7 @@ def list_users(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="you are not authorized to perform this action",
         )
-    users = list_users_db(db=db, limit=limit, offset=offset)
+    users = await list_users_db(db=db, limit=limit, offset=offset)
     return ListUsers(message="successfully fetched users", users=users)
 
 
@@ -112,7 +112,7 @@ def list_users(
     status_code=status.HTTP_200_OK,
     summary="promote users to admin role",
 )
-def promote_users(
+async def promote_users(
     user_id: int,
     db: SessionDep,
     admin_payload: TokenPayloadDep,
@@ -129,7 +129,7 @@ def promote_users(
             detail="please provide user_id to promote",
         )
     try:
-        user_client = promote_user_db(db=db, user_id=user_id)
+        user_client = await promote_user_db(db=db, user_id=user_id)
         if user_client is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -153,7 +153,7 @@ def promote_users(
     status_code=status.HTTP_200_OK,
     summary="delete users",
 )
-def delete_users(
+async def delete_users(
     user_id: int,
     db: SessionDep,
     admin_payload: TokenPayloadDep,
@@ -176,7 +176,7 @@ def delete_users(
         )
 
     try:
-        deleted = delete_user_db(db=db, user_id=user_id)
+        deleted = await delete_user_db(db=db, user_id=user_id)
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

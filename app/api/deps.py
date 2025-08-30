@@ -1,6 +1,4 @@
-from collections.abc import Generator
-from typing import Annotated, Optional
-from sqlalchemy.orm import Session
+from typing import Annotated, Optional, AsyncGenerator
 from app.core.db import SessionLocal
 from fastapi import Depends, Request, HTTPException, status, Header
 from fastapi.security import HTTPBearer, APIKeyHeader
@@ -10,6 +8,8 @@ from app.token_svc.token_models import TokenData, ApiData
 from jose import JWTError, ExpiredSignatureError
 from app.provisioner.manager import ProvisionManager
 from app.dao.api_keys_dao import get_api_key_for_verification
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 oauth2_scheme = HTTPBearer(auto_error=False)
 
@@ -21,12 +21,9 @@ api_key_scheme = APIKeyHeader(
 )
 
 
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with SessionLocal() as session:
+        yield session
 
 
 def get_aws_client_manager(request: Request) -> AwsClientManager:
@@ -47,7 +44,7 @@ def get_provision_manager(request: Request) -> ProvisionManager:
     return request.app.state.provision_manager
 
 
-SessionDep = Annotated[Session, Depends(get_db)]
+SessionDep = Annotated[AsyncSession, Depends(get_db)]
 TokenDep = Annotated[TokenManager, Depends(get_token_manager)]
 AwsDep = Annotated[AwsClientManager, Depends(get_aws_client_manager)]
 ProvisionDep = Annotated[ProvisionManager, Depends(get_provision_manager)]
@@ -102,7 +99,6 @@ async def get_token_payload(
 async def get_api_payload(
     db: SessionDep,
     token_manager: TokenDep,
-    _api_key_for_openapi: Annotated[Optional[str], Depends(api_key_scheme)] = None,
     authorization: Annotated[
         Optional[str], Header(alias="Authorization", convert_underscores=False)
     ] = None,

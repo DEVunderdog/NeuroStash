@@ -3,16 +3,24 @@ from typing import List, Tuple
 
 from sqlalchemy import and_, case, cast, delete, insert, or_, select, update, func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.dao.models import CreateDocument
-from app.dao.schema import DocumentRegistry, OperationStatusEnum
+from app.dao.schema import DocumentRegistry, OperationStatusEnum, KnowledgeBaseDocument
 
 logger = logging.getLogger(__name__)
 
 
-def create_document(
-    *, db: Session, files: List[CreateDocument]
+class DocumentInKnowledgeBaseError(Exception):
+    def __init__(
+        self,
+        message="one or more documents are already preset in knowledge base and cannot be locked",
+    ):
+        self.message = message
+        super().__init__(self.message)
+
+
+async def create_document(
+    *, db: AsyncSession, files: List[CreateDocument]
 ) -> List[Tuple[int, str]]:
     try:
         documents_data = [
@@ -29,28 +37,31 @@ def create_document(
         stmt = insert(DocumentRegistry).returning(
             DocumentRegistry.id, DocumentRegistry.file_name
         )
-        result = db.execute(stmt, documents_data)
+
+        result = await db.execute(stmt, documents_data)
 
         created_documents = [(row.id, row.file_name) for row in result.fetchall()]
 
-        db.commit()
+        await db.commit()
 
         logger.info(f"successfully created {len(created_documents)} documents")
 
         return created_documents
 
     except IntegrityError:
-        db.rollback()
+        await db.rollback()
         logging.error("integrity error during creating documents", exc_info=True)
         raise ValueError("duplicate file names or constraint violation")
 
     except Exception:
-        db.rollback()
+        await db.rollback()
         logging.error("error during bulk document creation", exc_info=True)
         raise
 
 
-def finalize_documents(*, db: Session, successful: List[int], failed: List[int]):
+async def finalize_documents(
+    *, db: AsyncSession, successful: List[int], failed: List[int]
+):
     try:
         all_ids = successful + failed
 
@@ -78,17 +89,17 @@ def finalize_documents(*, db: Session, successful: List[int], failed: List[int])
             )
         )
 
-        db.execute(stmt)
+        await db.execute(stmt)
 
-        db.commit()
+        await db.commit()
     except Exception:
         db.rollback()
         logger.error("error finalizing documents in database", exc_info=True)
         raise
 
 
-def list_files(
-    *, db: Session, user_id: int, limit: int, offset: int
+async def list_files(
+    *, db: AsyncSession, user_id: int, limit: int, offset: int
 ) -> Tuple[List[DocumentRegistry], int]:
     try:
         stmt = select(DocumentRegistry).where(
@@ -99,12 +110,14 @@ def list_files(
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
 
-        total_count = db.execute(count_stmt).scalar()
+        count_result = await db.execute(count_stmt)
+        total_count = count_result.scalar()
 
         stmt = stmt.limit(limit=limit)
         stmt = stmt.offset(offset=offset)
 
-        documents = db.execute(stmt).scalars().all()
+        result = await db.execute(stmt)
+        documents = result.scalars().all()
 
         return documents, total_count
     except Exception:
@@ -112,8 +125,21 @@ def list_files(
         raise
 
 
-def lock_documents(*, db: Session, document_ids: List[int], user_id: int) -> List[str]:
+async def lock_documents(
+    *, db: AsyncSession, document_ids: List[int], user_id: int
+) -> List[str]:
     try:
+        query = select(KnowledgeBaseDocument.document_id).where(
+            KnowledgeBaseDocument.document_id.in_(document_ids)
+        )
+        result = await db.execute(query)
+        existing_docs = result.scalars().all()
+
+        if existing_docs:
+            raise DocumentInKnowledgeBaseError(
+                f"documents with IDs {existing_docs} are in knowledge base"
+            )
+        
         stmt = (
             update(DocumentRegistry)
             .where(
@@ -125,17 +151,17 @@ def lock_documents(*, db: Session, document_ids: List[int], user_id: int) -> Lis
             .values(lock_status=True, op_status=OperationStatusEnum.PENDING)
             .returning(DocumentRegistry.object_key)
         )
-        result = db.execute(stmt)
+        result = await db.execute(stmt)
         object_keys = [row.object_key for row in result.fetchall()]
-        db.commit()
+        await db.commit()
         return object_keys
     except Exception:
-        db.rollback()
+        await db.rollback()
         logger.error("error locking the documents", exc_info=True)
         raise
 
 
-def delete_documents(*, db: Session, document_ids: List[int], user_id: int):
+async def delete_documents(*, db: AsyncSession, document_ids: List[int], user_id: int):
     try:
         stmt = delete(DocumentRegistry).where(
             DocumentRegistry.id.in_(document_ids),
@@ -144,15 +170,15 @@ def delete_documents(*, db: Session, document_ids: List[int], user_id: int):
             DocumentRegistry.user_id == user_id,
         )
 
-        db.execute(stmt)
-        db.commit()
+        await db.execute(stmt)
+        await db.commit()
     except Exception:
-        db.rollback()
+        await db.rollback()
         logger.error("error during deleting file in database", exc_info=True)
         raise
 
 
-def conflicted_docs(*, db: Session, user_id: int) -> List[DocumentRegistry]:
+async def conflicted_docs(*, db: AsyncSession, user_id: int) -> List[DocumentRegistry]:
     try:
         valid_combinations = [
             (True, OperationStatusEnum.PENDING),
@@ -177,15 +203,19 @@ def conflicted_docs(*, db: Session, user_id: int) -> List[DocumentRegistry]:
             )
         )
 
-        result = db.execute(stmt)
+        result = await db.execute(stmt)
         return result.scalars().all()
     except Exception:
         logger.error("error while fetching conflicted documents", exc_info=True)
         raise
 
 
-def cleanup_docs(
-    *, db: Session, user_id: int, to_be_unlocked: List[int], to_be_deleted: List[int]
+async def cleanup_docs(
+    *,
+    db: AsyncSession,
+    user_id: int,
+    to_be_unlocked: List[int],
+    to_be_deleted: List[int],
 ):
     try:
         if to_be_deleted:
@@ -193,7 +223,7 @@ def cleanup_docs(
                 DocumentRegistry.id.in_(to_be_deleted),
                 DocumentRegistry.user_id == user_id,
             )
-            db.execute(stmt)
+            await db.execute(stmt)
 
         if to_be_unlocked:
             stmt = (
@@ -204,9 +234,9 @@ def cleanup_docs(
                 )
                 .values(lock_status=False, op_status=OperationStatusEnum.SUCCESS)
             )
-            db.execute(stmt)
+            await db.execute(stmt)
 
-        db.commit()
+        await db.commit()
     except Exception:
         db.rollback()
         logger.error("error cleaning up docs in database", exc_info=True)

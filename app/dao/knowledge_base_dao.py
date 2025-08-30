@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy import select, func
 from app.dao.models import CreateKbInDb, ListKbDocs, KbDoc
@@ -20,7 +20,7 @@ class KnowledgeBaseAlreadyExists(Exception):
         super().__init__(f"knowledge with name '{knowledg_base_name}' already exists")
 
 
-def create_kb_db(*, db: Session, kb: CreateKbInDb) -> KnowledgeBase:
+async def create_kb_db(*, db: AsyncSession, kb: CreateKbInDb) -> KnowledgeBase:
     try:
         with db.begin_nested():
             stmt = (
@@ -31,7 +31,9 @@ def create_kb_db(*, db: Session, kb: CreateKbInDb) -> KnowledgeBase:
                 .with_for_update(skip_locked=True)
             )
 
-            available_collection = db.execute(stmt).scalar_one()
+            result = await db.execute(stmt)
+
+            available_collection = result.scalar_one()
 
             available_collection.status = ProvisionerStatusEnum.ASSIGNED
 
@@ -45,44 +47,47 @@ def create_kb_db(*, db: Session, kb: CreateKbInDb) -> KnowledgeBase:
 
             db.add(knowledge_base)
 
-        db.refresh(knowledge_base)
+        await db.refresh(knowledge_base)
         return knowledge_base
 
     except NoResultFound:
-        db.rollback()
+        await db.rollback()
         raise RuntimeError("no available milvus collection found.")
 
     except IntegrityError as e:
-        db.rollback()
+        await db.rollback()
         if isinstance(e.orig, psycopg.errors.UniqueViolation):
             raise KnowledgeBaseAlreadyExists(knowledg_base_name=kb.name)
         else:
             raise RuntimeError(f"database integrity error: {e}")
 
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise RuntimeError(f"failed to create knowledge base in database: {e}")
 
 
-def list_users_kb(
-    *, db: Session, limit: int = 100, offset: int = 0, user_id: int
+async def list_users_kb(
+    *, db: AsyncSession, limit: int = 100, offset: int = 0, user_id: int
 ) -> Tuple[List[KnowledgeBase], int]:
     stmt = select(KnowledgeBase).where(KnowledgeBase.user_id == user_id)
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
 
-    total_count = db.execute(count_stmt).scalar()
+    result = await db.execute(count_stmt)
+    total_count = result.scalar()
 
     stmt = stmt.limit(limit=limit)
     stmt = stmt.offset(offset=offset)
 
-    kb = db.execute(stmt).scalars().all()
+    kb_result = await db.execute(stmt)
+
+    kb = kb_result.scalars().all()
 
     return kb, total_count
 
 
-def list_kb_docs(
-    *, db: Session, limit: int = 200, offset: int = 0, user_id: int, kb_id: int
+async def list_kb_docs(
+    *, db: AsyncSession, limit: int = 200, offset: int = 0, user_id: int, kb_id: int
 ) -> ListKbDocs:
 
     query = (
@@ -106,16 +111,18 @@ def list_kb_docs(
 
     count_stmt = select(func.count()).select_from(query.subquery())
 
-    total_count = db.execute(count_stmt).scalar()
+    count_result = await db.execute(count_stmt)
+
+    total_count = count_result.scalar()
 
     query = query.limit(limit=limit)
     query = query.offset(offset=offset)
 
-    result = db.execute(query).all()
+    result = await db.execute(query)
 
     docs = [
         KbDoc(id=row.id, kb_doc_id=row.kb_doc_id, file_name=row.file_name)
-        for row in result
+        for row in result.all()
     ]
 
     return ListKbDocs(
@@ -126,22 +133,24 @@ def list_kb_docs(
     )
 
 
-def delete_kb_db(*, db: Session, user_id: int, kb_id: int) -> bool:
+async def delete_kb_db(*, db: AsyncSession, user_id: int, kb_id: int) -> bool:
     try:
         with db.begin_nested():
             stmt = select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
-            kb = db.execute(stmt).scalar_one()
+            result = await db.execute(stmt)
+            kb = result.scalar_one()
+
             if kb.milvus_collections:
                 kb.milvus_collections.status = ProvisionerStatusEnum.CLEANUP
             else:
                 raise RuntimeError(
                     f"inconsistent state: KnowledgeBase {kb_id} has no associated milvus collections"
                 )
-            db.delete(kb)
+            await db.delete(kb)
         return True
     except NoResultFound:
-        db.rollback()
+        await db.rollback()
         raise RuntimeError("none knowledge base found with that id")
     except Exception:
-        db.rollback()
+        await db.rollback()
         raise

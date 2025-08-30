@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
     status_code=status.HTTP_200_OK,
     summary="initialize the ingestion of data from documents",
 )
-def ingest_documents(
+async def ingest_documents(
     req: IngestionRequest, db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep
 ):
     doc_ids = req.file_ids or []
@@ -39,7 +39,7 @@ def ingest_documents(
     job_resource_id = uuid.uuid4()
 
     try:
-        result: CreatedIngestionJob = create_ingestion_job(
+        result: CreatedIngestionJob = await create_ingestion_job(
             db=db,
             document_ids=doc_ids,
             retry_kb_doc_ids=retry_ids,
@@ -60,21 +60,21 @@ def ingest_documents(
 
             aws_client.send_sqs_message(message_body=message)
 
-        db.commit()
+        await db.commit()
 
         return StandardResponse(
             message=f"successfully requested ingestion for {len(result.documents)} documents"
         )
 
     except KnowledgeBaseNotFound as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
 
     except SqsMessageError as e:
-        db.rollback()
+        await db.rollback()
         logger.error(
             f"sqs message failed after db prep for job {job_resource_id}. Rolling back",
             exc_info=True,
@@ -86,7 +86,7 @@ def ingest_documents(
         )
 
     except Exception:
-        db.rollback()
+        await db.rollback()
         logger.error(
             "Error creating ingestion job and sending SQS message", exc_info=True
         )
@@ -102,7 +102,7 @@ def ingest_documents(
     status_code=status.HTTP_200_OK,
     summary="delete the ingested data",
 )
-def delete_ingested_data(
+async def delete_ingested_data(
     req: IngestionRequest, db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep
 ):
     doc_ids = req.file_ids or []
@@ -123,7 +123,7 @@ def delete_ingested_data(
     job_resource_id = uuid.uuid4()
 
     try:
-        result: CreatedIngestionJob = create_ingestion_job(
+        result: CreatedIngestionJob = await create_ingestion_job(
             db=db,
             document_ids=doc_ids,
             retry_kb_doc_ids=retry_ids,
@@ -144,21 +144,21 @@ def delete_ingested_data(
 
             aws_client.send_sqs_message(message_body=message)
 
-        db.commit()
+        await db.commit()
 
         return StandardResponse(
             message="successfully requested for deletion of ingested data"
         )
 
     except KnowledgeBaseNotFound as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
 
     except SqsMessageError as e:
-        db.rollback()
+        await db.rollback()
         logger.error(
             f"sqs message failed after db prep for job {job_resource_id}. Rolling back",
             exc_info=True,
@@ -170,7 +170,7 @@ def delete_ingested_data(
         )
 
     except Exception:
-        db.rollback()
+        await db.rollback()
         logger.error(
             "Error creating ingestion job and sending SQS message", exc_info=True
         )

@@ -2,7 +2,6 @@ import logging
 import asyncio
 from app.aws.client import AwsClientManager
 from app.core.config import Settings
-from sqlalchemy.orm import Session
 from app.processor.processor_manager import ProcessorManager
 from app.dao.models import ReceivedSqsMessage
 from app.milvus.client import MilvusOps
@@ -13,7 +12,6 @@ logger = logging.getLogger(__name__)
 class ConsumerManager:
     def __init__(
         self,
-        db: Session,
         aws_client_manager: AwsClientManager,
         settings: Settings,
         milvus_ops: MilvusOps,
@@ -22,11 +20,9 @@ class ConsumerManager:
         self.settings = settings
         self.is_running = False
         self.consumer_task = None
-        self.db = db
         self.process_manager = ProcessorManager(
             aws_client_manager=aws_client_manager,
             settings=settings,
-            db=db,
             milvus_ops=milvus_ops,
         )
 

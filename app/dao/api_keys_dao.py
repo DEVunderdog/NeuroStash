@@ -1,10 +1,11 @@
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import aliased
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.dao.schema import ApiKey, UserClient
 from app.dao.models import StoreApiKey, VerifiedApiKey
 
 
-def store_api_key(*, db: Session, api_key_params: StoreApiKey) -> ApiKey:
+async def store_api_key(*, db: AsyncSession, api_key_params: StoreApiKey) -> ApiKey:
     try:
         api_key = ApiKey(
             user_id=api_key_params.user_id,
@@ -13,15 +14,15 @@ def store_api_key(*, db: Session, api_key_params: StoreApiKey) -> ApiKey:
             key_signature=api_key_params.key_signature,
         )
         db.add(api_key)
-        db.commit()
-        db.refresh(api_key)
+        await db.commit()
+        await db.refresh(api_key)
         return api_key
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise RuntimeError(f"failed to store api key: {e}")
 
 
-def get_api_key_for_verification(*, db: Session, api_key: bytes) -> VerifiedApiKey:
+async def get_api_key_for_verification(*, db: AsyncSession, api_key: bytes) -> VerifiedApiKey:
     u = aliased(UserClient)
 
     stmt = (
@@ -30,7 +31,9 @@ def get_api_key_for_verification(*, db: Session, api_key: bytes) -> VerifiedApiK
         .where(ApiKey.key_credential == api_key)
     )
 
-    row = db.execute(stmt).first()
+    result = await db.execute(stmt)
+
+    row = result.scalars().first()
 
     if not row:
         return None

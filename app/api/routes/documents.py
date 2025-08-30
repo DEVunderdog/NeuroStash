@@ -14,6 +14,7 @@ from app.dao.file_dao import (
     finalize_documents,
     list_files,
     lock_documents,
+    DocumentInKnowledgeBaseError,
 )
 from app.dao.models import (
     CreateDocument,
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
     status_code=status.HTTP_201_CREATED,
     summary="generate presigned urls for documents that needs to be uploaded",
 )
-def upload_documents(
+async def upload_documents(
     req: GeneratePresignedUrlsReq,
     db: SessionDep,
     payload: TokenPayloadDep,
@@ -64,7 +65,7 @@ def upload_documents(
             )
             list_of_documents.append(document)
 
-        created_documents = create_document(db=db, files=list_of_documents)
+        created_documents = await create_document(db=db, files=list_of_documents)
         final_response: Dict[int, str] = {}
 
         for doc_id, filename in created_documents:
@@ -102,7 +103,7 @@ def upload_documents(
     status_code=status.HTTP_200_OK,
     summary="finalized failed and successful files",
 )
-def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
+async def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
     if len(req.failed) == 0 and len(req.successful) == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -110,7 +111,7 @@ def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
         )
 
     try:
-        finalize_documents(db=db, successful=req.successful, failed=req.failed)
+        await finalize_documents(db=db, successful=req.successful, failed=req.failed)
         return StandardResponse(message="succcessfully finalized the documents")
     except Exception:
         logger.exception("error finalizing document", exc_info=True)
@@ -126,11 +127,11 @@ def post_upload_documents(req: FinalizeDocumentReq, db: SessionDep):
     status_code=status.HTTP_200_OK,
     summary="list of documents",
 )
-def list_documents(
+async def list_documents(
     db: SessionDep, payload: TokenPayloadDep, limit: int = 100, offset: int = 0
 ):
     try:
-        db_documents, total_count = list_files(
+        db_documents, total_count = await list_files(
             db=db, user_id=payload.user_id, limit=limit, offset=offset
         )
         if len(db_documents) == 0:
@@ -158,7 +159,7 @@ def list_documents(
     status_code=status.HTTP_200_OK,
     summary="delete documents",
 )
-def delete_file(
+async def delete_file(
     db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep, file_id: int
 ):
     if file_id == 0:
@@ -168,7 +169,18 @@ def delete_file(
         )
     ids = [file_id]
     try:
-        object_keys = lock_documents(db=db, document_ids=ids, user_id=payload.user_id)
+        object_keys = await lock_documents(
+            db=db, document_ids=ids, user_id=payload.user_id
+        )
+
+    except DocumentInKnowledgeBaseError:
+        msg = "Cannot delete file: it is currently part of a knowledge base."
+        logger.warning(f"{msg} File ID: {file_id}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=msg,
+        )
+
     except Exception:
         msg = "error locking documents for deletion, please sync up"
         logger.error(msg, exc_info=True)
@@ -191,7 +203,7 @@ def delete_file(
         )
 
     try:
-        delete_documents(db=db, document_ids=ids, user_id=payload.user_id)
+        await delete_documents(db=db, document_ids=ids, user_id=payload.user_id)
     except Exception:
         msg = "error deleting documents, please sync up"
         logger.error(msg, exc_info=True)
@@ -208,8 +220,8 @@ def delete_file(
     status_code=status.HTTP_200_OK,
     summary="cleanup successful",
 )
-def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
-    conflicting_docs = conflicted_docs(db=db, user_id=payload.user_id)
+async def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
+    conflicting_docs = await conflicted_docs(db=db, user_id=payload.user_id)
 
     if not conflicted_docs:
         return StandardResponse(message="none conflicting files found")
@@ -226,7 +238,7 @@ def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
 
     if to_be_deleted or to_be_unlocked:
         try:
-            cleanup_docs(
+            await cleanup_docs(
                 db=db,
                 user_id=payload.user_id,
                 to_be_unlocked=to_be_unlocked,

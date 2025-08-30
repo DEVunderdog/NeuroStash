@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update, union_all
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
@@ -21,9 +21,9 @@ class KnowledgeBaseNotFound(Exception):
     pass
 
 
-def create_ingestion_job(
+async def create_ingestion_job(
     *,
-    db: Session,
+    db: AsyncSession,
     document_ids: List[int],
     retry_kb_doc_ids: List[int],
     kb_id: int,
@@ -41,14 +41,15 @@ def create_ingestion_job(
             .where(KnowledgeBase.user_id == user_id)
         )
 
-        knowledge_base_result = db.execute(kb_stmt).first()
+        result = await db.execute(kb_stmt)
+        knowledge_base_result = result.first()
 
         if knowledge_base_result is None:
             raise KnowledgeBaseNotFound(
                 f"KnowledgeBase with id={kb_id} and user_id={user_id} not found."
             )
 
-        ingestion_job_id = db.execute(
+        ingestion_job_id = await db.execute(
             insert(IngestionJob)
             .values(
                 kb_id=kb_id,
@@ -103,13 +104,13 @@ def create_ingestion_job(
 
         if document_detail_queries:
             final_select_stmt = union_all(*document_detail_queries)
-            results = db.execute(final_select_stmt).all()
+            results = await db.execute(final_select_stmt)
 
             ingested_documents = [
                 FileForIngestion(
                     kb_doc_id=row.id, file_name=row.file_name, object_key=row.object_key
                 )
-                for row in results
+                for row in results.all()
             ]
 
         return CreatedIngestionJob(
@@ -122,15 +123,15 @@ def create_ingestion_job(
         )
 
     except (KnowledgeBaseNotFound, SQLAlchemyError) as e:
-        db.rollback()
+        await db.rollback()
         logger.error(
             f"Error during ingestion job creation for kb_id={kb_id}: {e}",
             exc_info=True,
         )
         raise
-    
+
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(
             f"Unexpected error during ingestion job creation for kb_id={kb_id}: {e}",
             exc_info=True,

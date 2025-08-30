@@ -34,7 +34,6 @@ logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
-
 async def schedule_cleanup_job(provision_manager: ProvisionManager):
     logger.info("scheduler starting 'cleanup_collections' job")
     try:
@@ -59,6 +58,7 @@ async def lifespan(app: FastAPI):
     app.state.provision_manager = provision_manager
 
     reconcilation_task = asyncio.create_task(provision_manager.reconcilation_worker())
+    cleanup_task = asyncio.create_task(provision_manager.cleanup_worker())
 
     scheduler.add_job(
         schedule_cleanup_job,
@@ -95,11 +95,15 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown()
 
     reconcilation_task.cancel()
+    cleanup_task.cancel()
 
     try:
         await reconcilation_task
+        await cleanup_task
     except asyncio.CancelledError:
-        logger.info("Reconciliation worker task has been cancelled and stopped.")
+        logger.info(
+            "Reconciliation worker task and cleanup task has been cancelled and stopped."
+        )
 
     db_session.close()
 

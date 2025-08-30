@@ -40,7 +40,7 @@ def generate_token(token_manager: TokenDep, payload: ApiPayloadDep):
     status_code=status.HTTP_201_CREATED,
     summary="generate multiple api keys for user",
 )
-def generate_user_api_keys(
+async def generate_user_api_keys(
     db: SessionDep, token_manager: TokenDep, payload: ApiPayloadDep
 ):
     try:
@@ -63,7 +63,7 @@ def generate_user_api_keys(
         )
 
     try:
-        store_api_key(
+        await store_api_key(
             db=db,
             api_key_params=StoreApiKey(
                 user_id=payload.user_id,
