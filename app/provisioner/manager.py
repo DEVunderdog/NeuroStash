@@ -30,7 +30,7 @@ class ProvisionManager:
         self._cleanup_trigger_queue = asyncio.Queue()
 
     async def provision_new_collection(self):
-        collection_name = generate_random_string()
+        collection_name = f"_{generate_random_string()}"
         collection_record_id = None
         try:
             async with SessionLocal() as db:
@@ -115,11 +115,11 @@ class ProvisionManager:
                                 MilvusCollections.status
                                 == ProvisionerStatusEnum.PROVISIONING
                             )
-                            & (MilvusCollections.created_at >= time_threshold)
+                            & (MilvusCollections.created_at >= time_threshold),
+                            1,
                         ),
-                        1,
-                    ),
-                    else_=0,
+                        else_=0,
+                    )
                 ).label("provisioning_count"),
             )
 

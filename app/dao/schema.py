@@ -195,7 +195,7 @@ class KnowledgeBase(Base, TimestampMixin):
         back_populates="knowledge_base", cascade="all, delete-orphan"
     )
     milvus_collections: Mapped["MilvusCollections"] = relationship(
-        back_populates="milvus_collections"
+        back_populates="knowledge_bases"
     )
 
     __table_args__ = (

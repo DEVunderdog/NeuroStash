@@ -19,6 +19,12 @@ class MilvusOps:
 
         self.client = MilvusClient(uri=self.settings.MILVUS_URL, token=token)
 
+    def ensure_database(self, name: str):
+        databases = self.get_database(name=name)
+        if name not in databases:
+            self.create_database(name=name)
+        self.client.use_database(db_name=name)
+
     def create_database(self, name: str):
         try:
             self.client.create_database(db_name=name)
@@ -26,9 +32,9 @@ class MilvusOps:
             logger.error("error creating database in milvus", exc_info=True)
             raise
 
-    def get_database(self, name: str):
-        data = self.client.describe_database(db_name=name)
-        if data["name"] == "":
+    def get_database(self, name: str) -> List[str]:
+        data = self.client.list_databases(db_name=name)
+        if not data or len(data) == 0:
             return None
         else:
             return data
@@ -84,6 +90,8 @@ class MilvusOps:
                 field_name="text_content",
                 datatype=DataType.VARCHAR,
                 nullable=False,
+                max_length=65535,
+                enable_analyzer=True
             )
             schema.add_field(
                 field_name="user_id",

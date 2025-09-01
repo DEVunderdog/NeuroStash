@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     MILVUS_URL: str
     MILVUS_USER: Optional[str] = None
     MILVUS_PASSWORD: Optional[str] = None
+    MILVUS_DATABASE: str
 
 
 settings = Settings()

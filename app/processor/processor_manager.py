@@ -5,8 +5,7 @@ from typing import List, Tuple
 
 from langchain_openai import OpenAIEmbeddings
 from sqlalchemy import case, update
-from sqlalchemy.orm import Session
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.aws.client import AwsClientManager
 from app.constants.models import OPENAI_EMBEDDINGS_MODEL
 from app.core.config import Settings
@@ -15,6 +14,8 @@ from app.dao.schema import IngestionJob, KnowledgeBaseDocument, OperationStatusE
 from app.milvus.client import MilvusOps
 from app.processor.ingest_data import IngestData
 from app.processor.semantic_chunker import CustomSemanticChunker
+from app.core.db import SessionLocal
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +29,10 @@ class ProcessorManager:
         self,
         aws_client_manager: AwsClientManager,
         settings: Settings,
-        db: Session,
         milvus_ops: MilvusOps,
     ):
         self.aws_client_manager: AwsClientManager = aws_client_manager
         self.settings: Settings = settings
-        self.db: Session = db
         self.embeddings = OpenAIEmbeddings(
             model=OPENAI_EMBEDDINGS_MODEL, api_key=settings.OPENAI_KEY
         )
@@ -62,7 +61,7 @@ class ProcessorManager:
                     collection_name=message.body.collection_name,
                 )
             )
-            tasks.append(indexing_task)
+            tasks.append(asyncio.create_task(indexing_task))
 
         if message.body.delete_kb_doc_id and len(message.body.delete_kb_doc_id):
             delete_files: List[FileForIngestion] = message.body.delete_kb_doc_id
@@ -71,95 +70,97 @@ class ProcessorManager:
                     files=delete_files, collection_name=message.body.collection_name
                 )
             )
-            tasks.append(reindexing_task)
+            tasks.append(asyncio.create_task(reindexing_task))
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return results
 
-    def _bulk_update_document_statuses(
-        self, results: List[Tuple[int, OperationStatusEnum]]
+    async def _bulk_update_document_statuses(
+        self, db: AsyncSession, results: List[Tuple[int, OperationStatusEnum]]
     ):
         if not results or len(results) == 0:
             logger.info("no document statues to update")
             return
 
-        try:
-            status_map = {doc_id: status.value for doc_id, status in results}
-
-            stmt = (
-                update(KnowledgeBaseDocument)
-                .where(KnowledgeBaseDocument.id.in_(status_map.keys()))
-                .values(
-                    status=case(
-                        whens=status_map,
-                        value=KnowledgeBaseDocument.id,
-                        else_=KnowledgeBaseDocument.status,
-                    )
+        status_map = {doc_id: status.value for doc_id, status in results}
+        stmt = (
+            update(KnowledgeBaseDocument)
+            .where(KnowledgeBaseDocument.id.in_(status_map.keys()))
+            .values(
+                status=case(
+                    whens=status_map,
+                    value=KnowledgeBaseDocument.id,
+                    else_=KnowledgeBaseDocument.status,
                 )
             )
+        )
+        await db.execute(stmt)
+        logger.info("successfully updated document statuses")
 
-            self.db.execute(stmt)
-            logger.info("successfully updated document statuses")
+    async def _set_ingestion_job_status(
+        self, db: AsyncSession, job_id: int, status: OperationStatusEnum
+    ):
+        stmt = (
+            update(IngestionJob)
+            .where(IngestionJob.id == job_id)
+            .values(op_status=status)
+        )
+        await db.execute(stmt)
+
+    async def process_message(self, message: ReceivedSqsMessage):
+        logger.info("initiating processing message")
+        try:
+            all_results = asyncio.run(self._process_tasks_concurrently(message=message))
+            logger.info("indexing and reindexing is completed")
+
+            exceptions = [res for res in all_results if isinstance(res, Exception)]
+            if exceptions:
+                for exc in exceptions:
+                    logger.error(
+                        f"An exception occurred during concurrent execution: {exc}",
+                        exc_info=exc,
+                    )
+                raise exceptions[0]
+
+            processed_items = itertools.chain.from_iterable(
+                response for response in all_results if isinstance(response, list)
+            )
+
+            async with SessionLocal() as db:
+                if processed_items:
+                    await self._bulk_update_document_statuses(
+                        db=db, results=processed_items
+                    )
+
+                await self._set_ingestion_job_status(
+                    db=db,
+                    job_id=message.body.ingestion_job_id,
+                    status=OperationStatusEnum.SUCCESS,
+                )
+
+                await db.commit()
+                logger.info(
+                    f"database updates for job {message.body.ingestion_job_id} committed successfully"
+                )
 
         except Exception as e:
             logger.error(
-                f"failedto perform bulk updates of document statuses: {e}",
+                f"An unexpected error occurred in process_message for job {message.body.ingestion_job_id}: {e}",
                 exc_info=True,
             )
-            raise
-
-    def process_message(self, message: ReceivedSqsMessage):
-        logger.info("initiating processing message")
-
-        all_results = asyncio.run(self._process_tasks_concurrently(message=message))
-        logger.info("indexing and reindexing is completed")
-
-        processed_items = itertools.chain.from_iterable(
-            response for response in all_results if isinstance(response, list)
-        )
-
-        exceptions = [res for res in all_results if isinstance(res, Exception)]
-
-        if exceptions:
-            for exc in exceptions:
-                logger.error(
-                    f"An exception occurred during concurrent execution: {exc}",
-                    exc_info=exc,
-                )
-
-        try:
-            if processed_items:
-                self._bulk_update_document_statuses(results=processed_items)
-
-            stmt = (
-                update(IngestionJob)
-                .where(IngestionJob.id == message.body.ingestion_job_id)
-                .values(op_status=OperationStatusEnum.SUCCESS)
-            )
-
-            self.db.execute(stmt)
-            self.db.commit()
-            logger.info("database updates committed successfully")
-        except Exception as e:
-            logger.error(
-                f"an unexpected error occurred in process_message: {e}", exc_info=True
-            )
-            self.db.rollback()
             try:
-                fail_stmt = (
-                    update(IngestionJob)
-                    .where(IngestionJob.id == message.body.ingestion_job_id)
-                    .values(op_status=OperationStatusEnum.FAILED)
-                )
-                self.db.execute(fail_stmt)
-                self.db.commit()
-                logger.warning(
-                    f"Successfully marked job {message.body.ingestion_job_id} as FAILED after transaction failure."
-                )
+                async with SessionLocal() as db:
+                    await self._set_ingestion_job_status(
+                        db=db,
+                        job_id=message.body.ingestion_job_id,
+                        status=OperationStatusEnum.FAILED,
+                    )
+                    await db.commit()
+                    logger.warning(
+                        f"Successfully marked job {message.body.ingestion_job_id} as FAILED after transaction failure."
+                    )
             except Exception as final_update_exc:
                 logger.critical(
-                    f"CRITICAL: Could not even mark job {message.body.ingestion_job_id} as FAILED. Manual intervention required. Error: {final_update_exc}",
+                    f"CRITICAL: Could not mark job {message.body.ingestion_job_id} as FAILED. Manual intervention required. Error: {final_update_exc}",
                     exc_info=True,
                 )
-                self.db.rollback()
-            raise

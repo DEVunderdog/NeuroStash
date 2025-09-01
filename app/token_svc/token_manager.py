@@ -8,13 +8,14 @@ from app.core.config import Settings
 from datetime import timedelta, datetime, timezone
 from jose import JWTError, jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.dao.encryption_keys_dao import (
     get_active_encryption_key,
     get_other_encryption_keys,
     create_encryption_key,
 )
 from app.token_svc.symmetric_key import generate_symmetric_key
+from app.core.db import SessionLocal
 import secrets
 import logging
 import os
@@ -33,18 +34,33 @@ class TokenManager:
     def __init__(
         self,
         settings: Settings,
-        initial_db_session: Session,
         aws_client_manager: AwsClientManager,
     ):
         self._aws_client_manager = aws_client_manager
-        self._active_key_config: Tuple[Dict[int, KeyInfo], int] = (
-            self._build_active_key_tuple(db=initial_db_session)
-        )
+        self._active_key_config: Optional[Tuple[Dict[int, KeyInfo], int]] = None
         self.settings = settings
 
-    def _build_active_key_tuple(self, db: Session) -> Tuple[Dict[int, KeyInfo], int]:
-        active_encryption_keys = get_active_encryption_key(db=db)
-        other_encryption_keys = get_other_encryption_keys(db=db)
+    @classmethod
+    async def create(
+        cls,
+        settings: Settings,
+        aws_client_manager: AwsClientManager,
+    ) -> "TokenManager":
+        instance = cls(settings, aws_client_manager)
+
+        async with SessionLocal() as db:
+            instance._active_key_config = await instance._build_active_key_tuple(db=db)
+
+        if instance._active_key_config is None:
+            raise RuntimeError("Failed to initialize TokenManager with encryption keys.")
+
+        return instance
+
+    async def _build_active_key_tuple(
+        self, db: AsyncSession
+    ) -> Tuple[Dict[int, KeyInfo], int]:
+        active_encryption_keys = await get_active_encryption_key(db=db)
+        other_encryption_keys = await get_other_encryption_keys(db=db)
         active_id: Optional[int] = None
         key_info: Dict[int, KeyInfo] = {}
         decrypted_key_info: Dict[int, KeyInfo] = {}
@@ -57,10 +73,12 @@ class TokenManager:
                 if cipher_key is None:
                     logger.error("cipher key is None")
                     raise RuntimeError("error encrypting keys")
-                active_id = create_encryption_key(db=db, symmetric_key=cipher_key)
+                active_id = await create_encryption_key(db=db, symmetric_key=cipher_key)
                 key_info[active_id] = KeyInfo(key=cipher_key)
             else:
-                active_id = create_encryption_key(db=db, symmetric_key=symmetric_key)
+                active_id = await create_encryption_key(
+                    db=db, symmetric_key=symmetric_key
+                )
                 key_info[active_id] = KeyInfo(key=symmetric_key)
         else:
             active_id = active_encryption_keys.id

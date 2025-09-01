@@ -84,7 +84,7 @@ class GeneratePresignedUrlsReq(BaseModel):
         ..., min_length=1, description="a list of filenames to upload"
     )
 
-    @field_validator("files", mode="each")
+    @field_validator("files", mode="before")
     @classmethod
     def check_file_extension(cls, filename: str) -> str:
         _root, extension = os.path.splitext(filename)

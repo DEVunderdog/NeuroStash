@@ -1,13 +1,11 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from sqlalchemy.orm import Session
 from fastapi.exceptions import RequestValidationError
 import asyncio
 
 from app.api.main import api_router
 from app.core.config import settings
 from app.aws.client import AwsClientManager
-from app.core.db import SessionLocal
 from app.token_svc.token_manager import TokenManager
 from app.consumer.consumer_manager import ConsumerManager
 from app.provisioner.manager import ProvisionManager
@@ -27,12 +25,33 @@ logging.basicConfig(
     format="%(levelname)-8s [%(asctime)s] [%(name)s] %(message)s (%(filename)s:%(lineno)d)",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logging.getLogger("sqlalchemy.dialects").setLevel(logging.INFO)
-logging.getLogger("sqlalchemy.pool").setLevel(logging.INFO)
-logging.getLogger("sqlalchemy.orm").setLevel(logging.INFO)
-logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
+logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
+logging.getLogger("botocore").setLevel(logging.WARNING)
+logging.getLogger("boto3").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("s3transfer").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+
+
+def create_robust_task(coro, task_name: str):
+    async def task_wrapper():
+        try:
+            await coro
+        except asyncio.CancelledError:
+            logger.info(f"Task '{task_name}' was cancelled.")
+        except Exception:
+            logger.critical(
+                f"Critical unhandled exception in background task '{task_name}'",
+                exc_info=True,
+            )
+
+    return asyncio.create_task(task_wrapper(), name=task_name)
+
 
 async def schedule_cleanup_job(provision_manager: ProvisionManager):
     logger.info("scheduler starting 'cleanup_collections' job")
@@ -49,16 +68,19 @@ async def lifespan(app: FastAPI):
 
     app.state.aws_client_manager = AwsClientManager(settings=settings)
     app.state.milvus_ops = MilvusOps(settings=settings)
-    db_session: Session = SessionLocal()
 
     provision_manager = ProvisionManager(
-        session=db_session, settings=settings, milvusOps=app.state.milvus_ops
+        settings=settings, milvusOps=app.state.milvus_ops
     )
 
     app.state.provision_manager = provision_manager
 
-    reconcilation_task = asyncio.create_task(provision_manager.reconcilation_worker())
-    cleanup_task = asyncio.create_task(provision_manager.cleanup_worker())
+    reconcilation_task = create_robust_task(
+        provision_manager.reconcilation_worker(), "reconciliation_worker"
+    )
+    cleanup_task = create_robust_task(
+        provision_manager.reconcilation_worker(), "reconciliation_worker"
+    )
 
     scheduler.add_job(
         schedule_cleanup_job,
@@ -70,15 +92,14 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
 
-    app.state.token_manager = TokenManager(
-        initial_db_session=db_session,
-        aws_client_manager=app.state.aws_client_manager,
-    )
-
-    app.consumer_manager = ConsumerManager(
+    app.state.token_manager = await TokenManager.create(
         aws_client_manager=app.state.aws_client_manager,
         settings=settings,
-        db=db_session,
+    )
+
+    app.state.consumer_manager = ConsumerManager(
+        aws_client_manager=app.state.aws_client_manager,
+        settings=settings,
         milvus_ops=app.state.milvus_ops,
     )
 
@@ -105,7 +126,6 @@ async def lifespan(app: FastAPI):
             "Reconciliation worker task and cleanup task has been cancelled and stopped."
         )
 
-    db_session.close()
 
 
 app = FastAPI(
