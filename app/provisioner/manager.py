@@ -150,7 +150,8 @@ class ProvisionManager:
                 except Exception as e:
                     logger.error(f"failed to provision new index: {e}", exc_info=True)
                     raise
-
+        
+        exceptions = None
         try:
             async with asyncio.TaskGroup() as tg:
                 for i in range(needed):
@@ -160,7 +161,10 @@ class ProvisionManager:
                 f"reconcilation failed during provision of indexes: {eg.exceptions}"
             )
             logger.error(error_msg)
-            raise Exception(error_msg)
+            exceptions = eg
+
+        if exceptions:
+            raise
 
         logger.info("index reconcilation cycle finished")
 
@@ -260,7 +264,7 @@ class ProvisionManager:
             collections_for_cleanup = await self.get_cleanup_collections()
         except Exception:
             logger.error("Failed to query collections for cleanup.", exc_info=True)
-            return
+            raise
 
         if len(collections_for_cleanup) == 0:
             return
@@ -268,6 +272,7 @@ class ProvisionManager:
         logger.info(f"found {len(collections_for_cleanup)} collections for cleanup")
 
         semaphore = asyncio.Semaphore(self.maxProvisioner)
+        exceptions = None
 
         try:
             async with asyncio.TaskGroup() as tg:
@@ -280,8 +285,14 @@ class ProvisionManager:
         except* Exception as eg:
             error_msg = f"Cleanup cycle finished with {len(eg.exceptions)} error(s)."
             logger.error(error_msg, exc_info=True)
+            exceptions = eg
 
-        logger.info("successfully collections cleanup done")
+        if exceptions:
+            logger.info("Collections cleanup cycle finished with errors.")
+            raise exceptions
+        else:
+            logger.info("Successfully finished collections cleanup cycle.")
+
 
     async def _cleanup_one_collection(
         self, collection: MilvusCollections, sem: asyncio.Semaphore

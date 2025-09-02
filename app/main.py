@@ -9,6 +9,7 @@ from app.aws.client import AwsClientManager
 from app.token_svc.token_manager import TokenManager
 from app.consumer.consumer_manager import ConsumerManager
 from app.provisioner.manager import ProvisionManager
+from app.file_cleaner.cleaner import FileCleaner
 from app.milvus.client import MilvusOps
 from app.utils.scheduler import scheduler
 from app.core.exceptions import request_validation_exception_handler
@@ -53,13 +54,21 @@ def create_robust_task(coro, task_name: str):
     return asyncio.create_task(task_wrapper(), name=task_name)
 
 
-async def schedule_cleanup_job(provision_manager: ProvisionManager):
+async def schedule_cleanup_job(
+    provision_manager: ProvisionManager, file_cleaner: FileCleaner
+):
     logger.info("scheduler starting 'cleanup_collections' job")
     try:
         await provision_manager.cleanup_collections()
-        logger.info("scheduler finished 'cleanup_collections' job successfully.")
+        await file_cleaner.file_cleanup_worker()
+        logger.info(
+            "scheduler finished 'cleanup_collections and files' job successfully."
+        )
     except Exception as e:
-        logger.error(f"scheduled 'cleanup_collections' job failed: {e}", exc_info=True)
+        logger.error(
+            f"scheduled 'cleanup_collections' and 'files cleanup' job failed: {e}",
+            exc_info=True,
+        )
 
 
 @asynccontextmanager
@@ -75,11 +84,13 @@ async def lifespan(app: FastAPI):
 
     app.state.provision_manager = provision_manager
 
+    file_cleaner = FileCleaner(aws_client=app.state.aws_client_manager)
+
     reconcilation_task = create_robust_task(
         provision_manager.reconcilation_worker(), "reconciliation_worker"
     )
     cleanup_task = create_robust_task(
-        provision_manager.reconcilation_worker(), "reconciliation_worker"
+        provision_manager.cleanup_worker(), "cleanup_worker"
     )
 
     scheduler.add_job(
@@ -88,7 +99,7 @@ async def lifespan(app: FastAPI):
         hour=2,
         minute=0,
         name="daily_collection_cleanup",
-        args=[provision_manager],
+        args=[provision_manager, file_cleaner],
     )
     scheduler.start()
 
@@ -125,7 +136,6 @@ async def lifespan(app: FastAPI):
         logger.info(
             "Reconciliation worker task and cleanup task has been cancelled and stopped."
         )
-
 
 
 app = FastAPI(

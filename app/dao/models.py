@@ -75,8 +75,14 @@ class GeneratedApiKey(StandardResponse):
     api_key: str
 
 
+class GeneratedUrls(BaseModel):
+    id: int
+    url: str
+    content_type: str
+
+
 class GeneratedPresignedUrls(StandardResponse):
-    urls: Dict[int, str]
+    urls: List[GeneratedUrls]
 
 
 class GeneratePresignedUrlsReq(BaseModel):
@@ -86,18 +92,20 @@ class GeneratePresignedUrlsReq(BaseModel):
 
     @field_validator("files", mode="before")
     @classmethod
-    def check_file_extension(cls, filename: str) -> str:
-        _root, extension = os.path.splitext(filename)
+    def check_file_extension(cls, files: List[str]) -> str:
+        for filename in files:
+            _root, extension = os.path.splitext(filename)
 
-        if not extension:
-            raise ValueError(f"File '{filename}' has no extension")
+            if not extension:
+                raise ValueError(f"File '{filename}' has no extension")
 
-        if extension.lower() not in ALLOWED_EXTENSIONS:
-            raise ValueError(
-                f"file type for '{filename}' is not allowed."
-                f"allowed extension are: {','.join(ALLOWED_EXTENSIONS)}"
-            )
-        return filename
+            if extension.lower() not in ALLOWED_EXTENSIONS:
+                raise ValueError(
+                    f"file type for '{filename}' is not allowed."
+                    f"allowed extension are: {','.join(ALLOWED_EXTENSIONS)}"
+                )
+
+        return files
 
     class Config:
         schema_extra = {"example": {"files": ["mydocument.pdf", "photo.jpg"]}}
@@ -137,14 +145,16 @@ class CreateKbInDb(BaseModel):
     user_id: int
     name: str
     category: str
-    collection_id: int
 
 
 class CreateKbReq(BaseModel):
     name: str = Field(..., min_length=5, max_length=50)
+    category: str = Field(..., min_length=3, max_length=50)
 
     class Config:
-        schema_extra = {"example": {"name": "dummy-knowledge-base"}}
+        schema_extra = {
+            "example": {"name": "dummy-knowledge-base", "category": "dummy-category"}
+        }
 
 
 class KnowledgeBaseItem(BaseModel):

@@ -119,7 +119,7 @@ async def get_api_payload(
 
     api_key_bytes = api_key_full_string.encode("utf-8")
 
-    verified_api_key = get_api_key_for_verification(db=db, api_key=api_key_bytes)
+    verified_api_key = await get_api_key_for_verification(db=db, api_key=api_key_bytes)
     if not verified_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="api key not found"

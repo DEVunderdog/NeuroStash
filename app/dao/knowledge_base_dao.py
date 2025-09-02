@@ -11,6 +11,7 @@ from app.dao.schema import (
     ProvisionerStatusEnum,
 )
 from typing import List, Tuple
+from sqlalchemy.orm import selectinload
 import psycopg
 
 
@@ -22,7 +23,7 @@ class KnowledgeBaseAlreadyExists(Exception):
 
 async def create_kb_db(*, db: AsyncSession, kb: CreateKbInDb) -> KnowledgeBase:
     try:
-        with db.begin_nested():
+        async with db.begin():
             stmt = (
                 select(MilvusCollections)
                 .where(MilvusCollections.status == ProvisionerStatusEnum.AVAILABLE)
@@ -135,8 +136,12 @@ async def list_kb_docs(
 
 async def delete_kb_db(*, db: AsyncSession, user_id: int, kb_id: int) -> bool:
     try:
-        with db.begin_nested():
-            stmt = select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
+        async with db.begin():
+            stmt = (
+                select(KnowledgeBase)
+                .options(selectinload(KnowledgeBase.milvus_collections))
+                .where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == user_id)
+            )
             result = await db.execute(stmt)
             kb = result.scalar_one()
 
@@ -149,8 +154,7 @@ async def delete_kb_db(*, db: AsyncSession, user_id: int, kb_id: int) -> bool:
             await db.delete(kb)
         return True
     except NoResultFound:
-        await db.rollback()
-        raise RuntimeError("none knowledge base found with that id")
+        raise
     except Exception:
         await db.rollback()
         raise

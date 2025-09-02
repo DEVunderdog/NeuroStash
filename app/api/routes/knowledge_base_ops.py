@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, status
-
+from sqlalchemy.exc import NoResultFound
 from app.api.deps import SessionDep, TokenPayloadDep, ProvisionDep
 from app.dao.knowledge_base_dao import (
     KnowledgeBaseAlreadyExists,
@@ -37,7 +37,9 @@ async def create_knowledge_base(
     provisioner: ProvisionDep,
 ):
     try:
-        args = CreateKbInDb(user_id=token_payload.user_id, name=req.name)
+        args = CreateKbInDb(
+            user_id=token_payload.user_id, name=req.name, category=req.category
+        )
         created_kb = await create_kb_db(db=db, kb=args)
         provisioner.trigger_reconcilation()
         return CreatedKb(
@@ -128,6 +130,12 @@ async def delete_kb(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="cannot find knowledge base to delete",
             )
+        
+    except NoResultFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="cannot find the knowledge base to delete"
+        )
     except HTTPException:
         raise
     except Exception as e:

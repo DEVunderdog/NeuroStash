@@ -33,7 +33,7 @@ async def get_api_key_for_verification(*, db: AsyncSession, api_key: bytes) -> V
 
     result = await db.execute(stmt)
 
-    row = result.scalars().first()
+    row = result.first()
 
     if not row:
         return None

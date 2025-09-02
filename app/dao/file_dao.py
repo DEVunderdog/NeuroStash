@@ -1,7 +1,7 @@
 import logging
 from typing import List, Tuple
 
-from sqlalchemy import and_, case, cast, delete, insert, or_, select, update, func
+from sqlalchemy import and_, case, cast, delete, insert, select, update, func, not_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dao.models import CreateDocument
@@ -139,7 +139,7 @@ async def lock_documents(
             raise DocumentInKnowledgeBaseError(
                 f"documents with IDs {existing_docs} are in knowledge base"
             )
-        
+
         stmt = (
             update(DocumentRegistry)
             .where(
@@ -178,29 +178,15 @@ async def delete_documents(*, db: AsyncSession, document_ids: List[int], user_id
         raise
 
 
-async def conflicted_docs(*, db: AsyncSession, user_id: int) -> List[DocumentRegistry]:
+async def conflicted_docs(*, db: AsyncSession) -> List[DocumentRegistry]:
     try:
-        valid_combinations = [
-            (True, OperationStatusEnum.PENDING),
-            (True, OperationStatusEnum.SUCCESS),
-            (True, OperationStatusEnum.FAILED),
-            (False, OperationStatusEnum.PENDING),
-            (False, OperationStatusEnum.FAILED),
-        ]
-
         stmt = select(DocumentRegistry).where(
-            and_(
-                DocumentRegistry.user_id == user_id,
-                or_(
-                    *[
-                        and_(
-                            DocumentRegistry.lock_status == lock_status,
-                            DocumentRegistry.op_status == op_status,
-                        )
-                        for lock_status, op_status in valid_combinations
-                    ]
-                ),
-            )
+            not_(
+                and_(
+                    DocumentRegistry.lock_status == False,
+                    DocumentRegistry.op_status == OperationStatusEnum.SUCCESS,
+                )
+            ),
         )
 
         result = await db.execute(stmt)
@@ -213,15 +199,13 @@ async def conflicted_docs(*, db: AsyncSession, user_id: int) -> List[DocumentReg
 async def cleanup_docs(
     *,
     db: AsyncSession,
-    user_id: int,
     to_be_unlocked: List[int],
     to_be_deleted: List[int],
 ):
     try:
         if to_be_deleted:
             stmt = delete(DocumentRegistry).where(
-                DocumentRegistry.id.in_(to_be_deleted),
-                DocumentRegistry.user_id == user_id,
+                DocumentRegistry.id.in_(to_be_deleted)
             )
             await db.execute(stmt)
 
@@ -230,7 +214,6 @@ async def cleanup_docs(
                 update(DocumentRegistry)
                 .where(
                     DocumentRegistry.id.in_(to_be_unlocked),
-                    DocumentRegistry.user_id == user_id,
                 )
                 .values(lock_status=False, op_status=OperationStatusEnum.SUCCESS)
             )
@@ -238,6 +221,6 @@ async def cleanup_docs(
 
         await db.commit()
     except Exception:
-        db.rollback()
+        await db.rollback()
         logger.error("error cleaning up docs in database", exc_info=True)
         raise

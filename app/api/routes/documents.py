@@ -21,6 +21,7 @@ from app.dao.models import (
     Document,
     FinalizeDocumentReq,
     GeneratedPresignedUrls,
+    GeneratedUrls,
     GeneratePresignedUrlsReq,
     ListDocuments,
     StandardResponse,
@@ -51,9 +52,10 @@ async def upload_documents(
             )
         list_of_documents: List[CreateDocument] = []
         url_by_filename: Dict[str, str] = {}
+        content_type: str = None
         for file in req.files:
             unique_id = uuid.uuid4()
-            filename = f"{file}-{unique_id}"
+            filename = f"{unique_id}-{file}"
             object_key = f"{payload.user_id}/{filename}"
             content_type = aws_client.extract_content_type(filename=file)
             url = aws_client.generate_presigned_upload_url(
@@ -66,12 +68,15 @@ async def upload_documents(
             list_of_documents.append(document)
 
         created_documents = await create_document(db=db, files=list_of_documents)
-        final_response: Dict[int, str] = {}
+        final_response: List[GeneratedPresignedUrls] = []
 
         for doc_id, filename in created_documents:
             presigned_url = url_by_filename.get(filename)
             if presigned_url:
-                final_response[doc_id] = presigned_url
+                generated_urls = GeneratedUrls(
+                    id=doc_id, url=presigned_url, content_type=content_type
+                )
+                final_response.append(generated_urls)
             else:
                 logger.error(
                     f"Consistency Error: Could not find pre-signed URL for document ID {doc_id} "
@@ -223,7 +228,7 @@ async def delete_file(
 async def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
     conflicting_docs = await conflicted_docs(db=db, user_id=payload.user_id)
 
-    if not conflicted_docs:
+    if not conflicting_docs:
         return StandardResponse(message="none conflicting files found")
 
     to_be_unlocked = []

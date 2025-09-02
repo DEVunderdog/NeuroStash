@@ -382,7 +382,6 @@ class AwsClientManager:
 
             response = self.sqs.receive_message(**params)
             messages = response.get("Messages", [])
-            logger.debug(f"received {len(messages)}")
 
             parsed_messages = []
             for raw_msg in messages:

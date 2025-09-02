@@ -80,6 +80,7 @@ class IngestData:
                     )
                     return (file.kb_doc_id, OperationStatusEnum.FAILED)
 
+        exceptions = None
         try:
             async with asyncio.TaskGroup() as tg:
                 tasks = [
@@ -98,6 +99,10 @@ class IngestData:
         except* Exception as eg:
             error_msg = f"indexing finished with {len(eg.exceptions)} errors"
             logger.error(error_msg, exc_info=True)
+            exceptions = eg
+
+        if exceptions:
+            raise
 
         logger.info("successfully index the data")
         return results
@@ -123,6 +128,7 @@ class IngestData:
                     )
                     return (file.kb_doc_id, OperationStatusEnum.FAILED)
 
+        exceptions = None
         try:
             async with asyncio.TaskGroup() as tg:
                 tasks = [
@@ -138,6 +144,10 @@ class IngestData:
         except* Exception as eg:
             error_msg = f"reindexing finished with {len(eg.exceptions)} errors"
             logger.error(error_msg, exc_info=True)
+            exceptions = eg
+
+        if exceptions:
+            raise
 
         logger.info("successfully reindexed the data")
         return results
