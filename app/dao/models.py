@@ -28,7 +28,7 @@ class RegisterUser(BaseModel):
     email: EmailStr
 
     class Config:
-        schema_extra = {"example": {"email": "john@example.com"}}
+        json_schema_extra = {"example": {"email": "john@example.com"}}
 
 
 class UserClientCreated(BaseModel):
@@ -108,7 +108,7 @@ class GeneratePresignedUrlsReq(BaseModel):
         return files
 
     class Config:
-        schema_extra = {"example": {"files": ["mydocument.pdf", "photo.jpg"]}}
+        json_schema_extra = {"example": {"files": ["mydocument.pdf", "photo.jpg"]}}
 
 
 class CreateDocument(BaseModel):
@@ -122,7 +122,7 @@ class FinalizeDocumentReq(BaseModel):
     successful: List[int]
 
     class Config:
-        schema_extra = {"example": {"failed": [1, 2, 3], "successful": [1, 2, 5]}}
+        json_schema_extra = {"example": {"failed": [1, 2, 3], "successful": [1, 2, 5]}}
 
 
 class Document(BaseModel):
@@ -152,7 +152,7 @@ class CreateKbReq(BaseModel):
     category: str = Field(..., min_length=3, max_length=50)
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {"name": "dummy-knowledge-base", "category": "dummy-category"}
         }
 
@@ -179,17 +179,17 @@ class ListedKb(StandardResponse):
 
 
 class FileForIngestion(BaseModel):
-    kb_doc_id: int
-    file_name: int
+    doc_id: int
+    file_name: str
     object_key: Optional[str] = None
 
 
 class SqsMessage(BaseModel):
     ingestion_job_id: int
-    job_resource_id: str
     index_kb_doc_id: Optional[List[FileForIngestion]] = None
     delete_kb_doc_id: Optional[List[FileForIngestion]] = None
     collection_name: str
+    kb_id: int
     category: str
     user_id: int
 
@@ -208,7 +208,7 @@ class IngestionRequest(BaseModel):
     retry_kb_doc_ids: List[int]
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "kb_id": 5,
                 "file_ids": [1, 5, 6],
@@ -219,11 +219,12 @@ class IngestionRequest(BaseModel):
 
 class CreatedIngestionJob(BaseModel):
     ingestion_id: int
-    ingestion_resource_id: str
     collection_name: str
     category: str
     user_id: int
+    kb_id: int
     documents: List[FileForIngestion]
+    successfully_processed_docs: List[int]
 
 
 class KbDoc(BaseModel):

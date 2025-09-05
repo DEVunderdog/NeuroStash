@@ -52,9 +52,7 @@ class ConsumerManager:
         try:
             logger.info(f"processing message: {message.message_id}")
 
-            await asyncio.to_thread(
-                self.process_manager.process_message, message=message
-            )
+            await self.process_manager.process_message(message=message)
 
             await self._delete_message(message.receipt_handle)
 

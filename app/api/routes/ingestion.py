@@ -51,11 +51,11 @@ async def ingest_documents(
         if result.documents:
             message = SqsMessage(
                 ingestion_job_id=result.ingestion_id,
-                job_resource_id=result.ingestion_resource_id,
                 index_kb_doc_id=result.documents,
                 collection_name=result.collection_name,
                 category=result.category,
                 user_id=result.user_id,
+                kb_id=result.kb_id,
             )
 
             aws_client.send_sqs_message(message_body=message)
@@ -126,7 +126,6 @@ async def delete_ingested_data(
         result: CreatedIngestionJob = await create_ingestion_job(
             db=db,
             document_ids=doc_ids,
-            retry_kb_doc_ids=retry_ids,
             kb_id=req.kb_id,
             job_resource_id=job_resource_id,
             user_id=payload.user_id,
@@ -135,7 +134,6 @@ async def delete_ingested_data(
         if result.documents:
             message = SqsMessage(
                 ingestion_job_id=result.ingestion_id,
-                job_resource_id=result.ingestion_resource_id,
                 delete_kb_doc_id=result.documents,
                 collection_name=result.collection_name,
                 category=result.category,
