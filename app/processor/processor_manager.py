@@ -61,7 +61,7 @@ class ProcessorManager:
                     collection_name=message.body.collection_name,
                 )
             )
-            tasks.append(asyncio.create_task(indexing_task))
+            tasks.append(indexing_task)
 
         if message.body.delete_kb_doc_id and len(message.body.delete_kb_doc_id):
             delete_files: List[FileForIngestion] = message.body.delete_kb_doc_id
@@ -70,7 +70,7 @@ class ProcessorManager:
                     files=delete_files, collection_name=message.body.collection_name
                 )
             )
-            tasks.append(asyncio.create_task(reindexing_task))
+            tasks.append(reindexing_task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return results
@@ -78,21 +78,22 @@ class ProcessorManager:
     async def _bulk_update_document_statuses(
         self, db: AsyncSession, results: List[Tuple[int, OperationStatusEnum]]
     ):
-        if not results or len(results) == 0:
+        if not results:
             logger.info("no document statues to update")
             return
 
-        status_map = {doc_id: status.value for doc_id, status in results}
+        status_map = {doc_id: status for doc_id, status in results}
+
+        status_case = case(
+            status_map,
+            value=KnowledgeBaseDocument.id,
+            else_=KnowledgeBaseDocument.status,
+        )
+
         stmt = (
             update(KnowledgeBaseDocument)
             .where(KnowledgeBaseDocument.id.in_(status_map.keys()))
-            .values(
-                status=case(
-                    whens=status_map,
-                    value=KnowledgeBaseDocument.id,
-                    else_=KnowledgeBaseDocument.status,
-                )
-            )
+            .values(status=status_case)
         )
         await db.execute(stmt)
         logger.info("successfully updated document statuses")
@@ -110,7 +111,7 @@ class ProcessorManager:
     async def process_message(self, message: ReceivedSqsMessage):
         logger.info("initiating processing message")
         try:
-            all_results = asyncio.run(self._process_tasks_concurrently(message=message))
+            all_results = await self._process_tasks_concurrently(message=message)
             logger.info("indexing and reindexing is completed")
 
             exceptions = [res for res in all_results if isinstance(res, Exception)]

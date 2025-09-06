@@ -72,13 +72,13 @@ class IngestData:
                     logger.info(
                         "successfully processed and inserted into milvus collection"
                     )
-                    return (file.doc_id, OperationStatusEnum.SUCCESS)
+                    return (file.kb_doc_id, OperationStatusEnum.SUCCESS)
                 except Exception as e:
                     logger.error(
                         f"error processing file and inserting into collection: {e}",
                         exc_info=True,
                     )
-                    return (file.doc_id, OperationStatusEnum.FAILED)
+                    return (file.kb_doc_id, OperationStatusEnum.FAILED)
 
         exceptions = None
         try:
@@ -94,8 +94,8 @@ class IngestData:
                     )
                     for item in files
                 ]
-                for task in tasks:
-                    results.append(task.result())
+            for task in tasks:
+                results.append(task.result())
         except* Exception as eg:
             error_msg = f"indexing finished with {len(eg.exceptions)} errors"
             logger.error(error_msg, exc_info=True)
@@ -120,13 +120,13 @@ class IngestData:
                         file=file, collection_name=collection_name
                     )
                     logger.info("successfully deleted from milvus")
-                    return (file.doc_id, OperationStatusEnum.SUCCESS)
+                    return (file.kb_doc_id, OperationStatusEnum.SUCCESS)
                 except Exception as e:
                     logger.error(
                         f"error processing file for reindexing and deletion from milvus: {e}",
                         exc_info=True,
                     )
-                    return (file.doc_id, OperationStatusEnum.FAILED)
+                    return (file.kb_doc_id, OperationStatusEnum.FAILED)
 
         exceptions = None
         try:
@@ -139,8 +139,9 @@ class IngestData:
                     )
                     for item in files
                 ]
-                for task in tasks:
-                    results.append(task.result())
+
+            for task in tasks:
+                results.append(task.result())
         except* Exception as eg:
             error_msg = f"reindexing finished with {len(eg.exceptions)} errors"
             logger.error(error_msg, exc_info=True)
@@ -236,16 +237,16 @@ class IngestData:
             data_for_milvus: List[CollectionSchemaEntity] = []
 
             for doc, embedding in zip(chunked_doc, embeddings):
-                id = generate_deterministic_uuid(name=file.file_name, id=file.doc_id)
+                id = generate_deterministic_uuid(name=file.file_name, id=file.kb_doc_id)
                 entity = CollectionSchemaEntity(
                     id=id,
                     text_dense_vector=embedding,
-                    text_content=doc,
+                    text_content=doc.page_content,
                     object_key=file.object_key,
                     category=category,
                     file_name=file.file_name,
                     user_id=user_id,
-                    file_id=file.doc_id,
+                    file_id=file.kb_doc_id,
                 )
                 data_for_milvus.append(entity)
 
@@ -258,7 +259,7 @@ class IngestData:
 
     def _process_reindexing(self, file: FileForIngestion, collection_name: str):
         try:
-            expr = f"file_id == {file.doc_id}"
+            expr = f"file_id == {file.kb_doc_id}"
             self.milvus_ops.delete_entities_record(
                 collection_name=collection_name, filter=expr
             )

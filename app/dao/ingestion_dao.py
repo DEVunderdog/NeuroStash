@@ -100,7 +100,10 @@ async def create_ingestion_job(
                     documents_to_be_ingested.append(doc_id)
                     file_for_ingestion.append(
                         FileForIngestion(
-                            doc_id=doc_id, file_name=file_name, object_key=object_key
+                            kb_doc_id=kb_doc_id,
+                            doc_id=doc_id,
+                            file_name=file_name,
+                            object_key=object_key,
                         )
                     )
                 if status == OperationStatusEnum.FAILED:
@@ -108,7 +111,10 @@ async def create_ingestion_job(
                     documents_to_be_ingested.append(doc_id)
                     file_for_ingestion.append(
                         FileForIngestion(
-                            doc_id=doc_id, file_name=file_name, object_key=object_key
+                            kb_doc_id=kb_doc_id,
+                            doc_id=doc_id,
+                            file_name=file_name,
+                            object_key=object_key,
                         )
                     )
                 if status == OperationStatusEnum.SUCCESS:
@@ -125,12 +131,12 @@ async def create_ingestion_job(
 
         return CreatedIngestionJob(
             ingestion_id=ingestion_job_id,
-            ingestion_resource_id=str(job_resource_id),
             collection_name=knowledge_base_result.collection_name,
             category=knowledge_base_result.category,
             user_id=user_id,
             documents=file_for_ingestion,
             successfully_processed_docs=successfully_processed_docs,
+            kb_id=kb_id,
         )
 
     except (KnowledgeBaseNotFound, SQLAlchemyError) as e:

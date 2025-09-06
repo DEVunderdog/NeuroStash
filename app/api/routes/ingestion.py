@@ -22,7 +22,6 @@ async def ingest_documents(
     req: IngestionRequest, db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep
 ):
     doc_ids = req.file_ids or []
-    retry_ids = req.retry_kb_doc_ids or []
 
     if req.kb_id == 0 or not req.kb_id:
         raise HTTPException(
@@ -30,10 +29,10 @@ async def ingest_documents(
             detail="please provide knowledge base id to ingest data into",
         )
 
-    if not doc_ids and not retry_ids:
+    if not doc_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="please provide 'file_ids` or 'retry_kb_doc_ids' to start an ingestion job",
+            detail="please provide 'file_ids` to start an ingestion job",
         )
 
     job_resource_id = uuid.uuid4()
@@ -42,7 +41,6 @@ async def ingest_documents(
         result: CreatedIngestionJob = await create_ingestion_job(
             db=db,
             document_ids=doc_ids,
-            retry_kb_doc_ids=retry_ids,
             kb_id=req.kb_id,
             job_resource_id=job_resource_id,
             user_id=payload.user_id,
@@ -106,7 +104,6 @@ async def delete_ingested_data(
     req: IngestionRequest, db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep
 ):
     doc_ids = req.file_ids or []
-    retry_ids = req.retry_kb_doc_ids or []
 
     if req.kb_id == 0 or not req.kb_id:
         raise HTTPException(
@@ -114,10 +111,10 @@ async def delete_ingested_data(
             detail="please provide knowledge base id to ingest data into",
         )
 
-    if not doc_ids and not retry_ids:
+    if not doc_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="please provide 'file_ids` or 'retry_kb_doc_ids' to start an ingestion job",
+            detail="please provide 'file_ids` to start an ingestion job",
         )
 
     job_resource_id = uuid.uuid4()

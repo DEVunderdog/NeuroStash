@@ -179,6 +179,7 @@ class ListedKb(StandardResponse):
 
 
 class FileForIngestion(BaseModel):
+    kb_doc_id: int
     doc_id: int
     file_name: str
     object_key: Optional[str] = None
@@ -205,7 +206,6 @@ class ReceivedSqsMessage(BaseModel):
 class IngestionRequest(BaseModel):
     kb_id: int
     file_ids: List[int]
-    retry_kb_doc_ids: List[int]
 
     class Config:
         json_schema_extra = {
