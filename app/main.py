@@ -61,6 +61,7 @@ async def schedule_cleanup_job(
     try:
         await provision_manager.cleanup_collections()
         await file_cleaner.file_cleanup_worker()
+        await file_cleaner.ingestion_job_cleaner()
         logger.info(
             "scheduler finished 'cleanup_collections and files' job successfully."
         )

@@ -1,9 +1,10 @@
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
+from datetime import datetime, timedelta, timezone
 from app.dao.models import CreatedIngestionJob, FileForIngestion
 from app.dao.schema import (
     KnowledgeBaseDocument,
@@ -167,3 +168,14 @@ async def get_ingestion_job_status(
     status = result.scalar()
 
     return status
+
+
+async def cleanup_ingestion_job(*, db: AsyncSession):
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=1)
+    stmt = delete(IngestionJob).where(
+        IngestionJob.op_status == OperationStatusEnum.PENDING,
+        IngestionJob.updated_at < cutoff_time,
+    )
+
+    await db.execute(stmt)
+    await db.commit()

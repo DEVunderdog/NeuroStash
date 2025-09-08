@@ -2,6 +2,7 @@ import logging
 from app.aws.client import AwsClientManager
 from app.core.db import SessionLocal
 from app.dao.file_dao import conflicted_docs, cleanup_docs
+from app.dao.ingestion_dao import cleanup_ingestion_job
 
 logger = logging.getLogger(__name__)
 
@@ -37,4 +38,12 @@ class FileCleaner:
                     )
         except Exception as e:
             logger.error(f"error cleaning up files: {e}")
+            raise
+
+    async def ingestion_job_cleaner(self):
+        try:
+            async with SessionLocal() as db:
+                await cleanup_ingestion_job(db=db)
+        except Exception as e:
+            logger.error(f"error cleaning up ingestion job: {e}")
             raise
