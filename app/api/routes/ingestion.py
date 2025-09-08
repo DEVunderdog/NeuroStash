@@ -3,7 +3,11 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from app.dao.models import StandardResponse, IngestionRequest, SqsMessage
 from app.api.deps import SessionDep, TokenPayloadDep, AwsDep
-from app.dao.ingestion_dao import create_ingestion_job, KnowledgeBaseNotFound
+from app.dao.ingestion_dao import (
+    create_ingestion_job,
+    KnowledgeBaseNotFound,
+    DocsNotFound,
+)
 from app.dao.models import CreatedIngestionJob
 from app.aws.client import SqsMessageError
 
@@ -71,6 +75,13 @@ async def ingest_documents(
             detail=str(e),
         )
 
+    except DocsNotFound as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
     except SqsMessageError as e:
         await db.rollback()
         logger.error(
@@ -94,7 +105,7 @@ async def ingest_documents(
         )
 
 
-@router.post(
+@router.delete(
     "/delete",
     response_model=StandardResponse,
     status_code=status.HTTP_200_OK,
@@ -135,6 +146,7 @@ async def delete_ingested_data(
                 collection_name=result.collection_name,
                 category=result.category,
                 user_id=result.user_id,
+                kb_id=result.kb_id,
             )
 
             aws_client.send_sqs_message(message_body=message)
@@ -151,6 +163,10 @@ async def delete_ingested_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
+
+    except DocsNotFound as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
     except SqsMessageError as e:
         await db.rollback()

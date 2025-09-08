@@ -1,6 +1,7 @@
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, update
+from sqlalchemy import select, insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
 from app.dao.models import CreatedIngestionJob, FileForIngestion
@@ -21,6 +22,12 @@ class KnowledgeBaseNotFound(Exception):
     pass
 
 
+class DocsNotFound(Exception):
+    def __init__(self, missing_ids):
+        self.missing_ids = missing_ids
+        super().__init__(f"documents not found: {missing_ids}")
+
+
 async def create_ingestion_job(
     *,
     db: AsyncSession,
@@ -30,7 +37,6 @@ async def create_ingestion_job(
     user_id: int,
 ) -> CreatedIngestionJob:
     try:
-
         kb_stmt = (
             select(MilvusCollections.collection_name, KnowledgeBase.category)
             .join(
@@ -48,6 +54,23 @@ async def create_ingestion_job(
                 f"KnowledgeBase with id={kb_id} and user_id={user_id} not found."
             )
 
+        existing_docs = await db.execute(
+            select(
+                DocumentRegistry.id,
+                DocumentRegistry.file_name,
+                DocumentRegistry.object_key,
+            ).where(DocumentRegistry.id.in_(document_ids))
+        )
+
+        existing_data = {
+            row.id: {"file_name": row.file_name, "object_key": row.object_key}
+            for row in existing_docs
+        }
+        missing_ids = set(document_ids) - set(existing_data.keys())
+
+        if missing_ids:
+            raise DocsNotFound(missing_ids=missing_ids)
+
         ingestion_job_id = (
             await db.execute(
                 insert(IngestionJob)
@@ -60,74 +83,45 @@ async def create_ingestion_job(
             )
         ).scalar_one()
 
-        documents_to_be_ingested: List[int] = []
-        kb_documents_to_reprocessed: List[int] = []
-        successfully_processed_docs: List[int] = []
+        kb_doc_pairs = [(kb_id, doc_id) for doc_id in document_ids]
+
+        stmt = (
+            pg_insert(KnowledgeBaseDocument)
+            .values(
+                [
+                    {
+                        "knowledge_base_id": kb_id,
+                        "document_id": doc_id,
+                        "status": OperationStatusEnum.PENDING,
+                    }
+                    for kb_id, doc_id in kb_doc_pairs
+                ]
+            )
+            .on_conflict_do_update(
+                index_elements=["knowledge_base_id", "document_id"],
+                set_={"status": OperationStatusEnum.PENDING},
+            )
+        ).returning(
+            KnowledgeBaseDocument.id,
+            KnowledgeBaseDocument.document_id,
+        )
+
+        kb_doc_upsert_result = await db.execute(stmt)
+
+        kb_doc_ids_rows = kb_doc_upsert_result.mappings().all()
+
         file_for_ingestion: List[FileForIngestion] = []
 
-        if document_ids:
-            stmt = (
-                select(
-                    KnowledgeBaseDocument.id.label("kb_doc_id"),
-                    KnowledgeBaseDocument.status,
-                    KnowledgeBaseDocument.document_id.label("doc_id"),
-                    DocumentRegistry.file_name,
-                    DocumentRegistry.object_key,
-                )
-                .join(
-                    DocumentRegistry,
-                    DocumentRegistry.id == KnowledgeBaseDocument.document_id,
-                )
-                .where(
-                    KnowledgeBaseDocument.knowledge_base_id == kb_id,
-                    KnowledgeBaseDocument.document_id.in_(document_ids),
-                )
-            )
-
-            document_result = await db.execute(stmt)
-
-            document_rows = document_result.all()
-
-            for row in document_rows:
-                kb_doc_id = row.kb_doc_id
-                doc_id = row.doc_id
-                status = row.status
-                file_name = row.file_name
-                object_key = row.object_key
-
-                if status == OperationStatusEnum.PENDING:
-                    kb_documents_to_reprocessed.append(kb_doc_id)
-                    documents_to_be_ingested.append(doc_id)
-                    file_for_ingestion.append(
-                        FileForIngestion(
-                            kb_doc_id=kb_doc_id,
-                            doc_id=doc_id,
-                            file_name=file_name,
-                            object_key=object_key,
-                        )
+        for row in kb_doc_ids_rows:
+            if row.document_id in existing_data:
+                file_for_ingestion.append(
+                    FileForIngestion(
+                        kb_doc_id=row.id,
+                        doc_id=row.document_id,
+                        file_name=existing_data[row.document_id]["file_name"],
+                        object_key=existing_data[row.document_id]["object_key"],
                     )
-                if status == OperationStatusEnum.FAILED:
-                    kb_documents_to_reprocessed.append(kb_doc_id)
-                    documents_to_be_ingested.append(doc_id)
-                    file_for_ingestion.append(
-                        FileForIngestion(
-                            kb_doc_id=kb_doc_id,
-                            doc_id=doc_id,
-                            file_name=file_name,
-                            object_key=object_key,
-                        )
-                    )
-                if status == OperationStatusEnum.SUCCESS:
-                    successfully_processed_docs.append(doc_id)
-
-            if kb_documents_to_reprocessed:
-                update_stmt = (
-                    update(KnowledgeBaseDocument)
-                    .where(KnowledgeBaseDocument.id.in_(kb_documents_to_reprocessed))
-                    .values(status=OperationStatusEnum.PENDING)
                 )
-
-                await db.execute(update_stmt)
 
         return CreatedIngestionJob(
             ingestion_id=ingestion_job_id,
@@ -135,7 +129,6 @@ async def create_ingestion_job(
             category=knowledge_base_result.category,
             user_id=user_id,
             documents=file_for_ingestion,
-            successfully_processed_docs=successfully_processed_docs,
             kb_id=kb_id,
         )
 
@@ -145,6 +138,11 @@ async def create_ingestion_job(
             f"Error during ingestion job creation for kb_id={kb_id}: {e}",
             exc_info=True,
         )
+        raise
+
+    except DocsNotFound as e:
+        await db.rollback()
+        logger.error(f"we cannot find the following documents: {e}")
         raise
 
     except Exception as e:

@@ -96,6 +96,7 @@ async def list_kb_docs(
             DocumentRegistry.id,
             DocumentRegistry.file_name,
             KnowledgeBaseDocument.id.label("kb_doc_id"),
+            KnowledgeBaseDocument.status
         )
         .join(
             KnowledgeBaseDocument,
@@ -106,7 +107,6 @@ async def list_kb_docs(
             DocumentRegistry.op_status == OperationStatusEnum.SUCCESS,
             DocumentRegistry.lock_status == False,
             KnowledgeBaseDocument.knowledge_base_id == kb_id,
-            KnowledgeBaseDocument.status == OperationStatusEnum.SUCCESS,
         )
     )
 
@@ -122,7 +122,7 @@ async def list_kb_docs(
     result = await db.execute(query)
 
     docs = [
-        KbDoc(id=row.id, kb_doc_id=row.kb_doc_id, file_name=row.file_name)
+        KbDoc(kb_doc_id=row.kb_doc_id, doc_id=row.id, file_name=row.file_name, status=row.status.value)
         for row in result.all()
     ]
 

@@ -224,13 +224,13 @@ class CreatedIngestionJob(BaseModel):
     user_id: int
     kb_id: int
     documents: List[FileForIngestion]
-    successfully_processed_docs: List[int]
 
 
 class KbDoc(BaseModel):
-    id: int
     kb_doc_id: int
+    doc_id: int
     file_name: str
+    status: str
 
 
 class ListKbDocs(StandardResponse):

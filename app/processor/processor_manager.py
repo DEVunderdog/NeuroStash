@@ -1,10 +1,9 @@
 import asyncio
-import itertools
 import logging
 from typing import List, Tuple
 
 from langchain_openai import OpenAIEmbeddings
-from sqlalchemy import case, update
+from sqlalchemy import case, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.aws.client import AwsClientManager
 from app.constants.models import OPENAI_EMBEDDINGS_MODEL
@@ -22,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 class InvalidFileExtension(Exception):
     pass
-
 
 class ProcessorManager:
     def __init__(
@@ -48,32 +46,49 @@ class ProcessorManager:
 
     async def _process_tasks_concurrently(
         self, message: ReceivedSqsMessage
-    ) -> List[List[Tuple[int, OperationStatusEnum]]]:
-        tasks = []
+    ) -> Tuple[List, List]:
+        tasks_to_run = []
+        indexing_task_present = False
+        reindexing_task_present = False
 
         if message.body.index_kb_doc_id and len(message.body.index_kb_doc_id):
             index_files: List[FileForIngestion] = message.body.index_kb_doc_id
-            indexing_task = asyncio.create_task(
-                self.ingest_data_ops.index_data(
-                    files=index_files,
-                    user_id=message.body.user_id,
-                    category=message.body.category,
-                    collection_name=message.body.collection_name,
+            tasks_to_run.append(
+                asyncio.create_task(
+                    self.ingest_data_ops.index_data(
+                        files=index_files,
+                        user_id=message.body.user_id,
+                        category=message.body.category,
+                        collection_name=message.body.collection_name,
+                    )
                 )
             )
-            tasks.append(indexing_task)
+            indexing_task_present = True
 
         if message.body.delete_kb_doc_id and len(message.body.delete_kb_doc_id):
             delete_files: List[FileForIngestion] = message.body.delete_kb_doc_id
-            reindexing_task = asyncio.create_task(
-                self.ingest_data_ops.reindex_data(
-                    files=delete_files, collection_name=message.body.collection_name
+            tasks_to_run.append(
+                asyncio.create_task(
+                    self.ingest_data_ops.reindex_data(
+                        files=delete_files, collection_name=message.body.collection_name
+                    )
                 )
             )
-            tasks.append(reindexing_task)
+            reindexing_task_present = True
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        return results
+        if not tasks_to_run:
+            return [], []
+
+        all_results = await asyncio.gather(*tasks_to_run)
+
+        if indexing_task_present and reindexing_task_present:
+            return all_results[0], all_results[1]
+        elif indexing_task_present:
+            return all_results[0], []
+        elif reindexing_task_present:
+            return [], all_results[0]
+        else:
+            return [], []
 
     async def _bulk_update_document_statuses(
         self, db: AsyncSession, results: List[Tuple[int, OperationStatusEnum]]
@@ -108,40 +123,88 @@ class ProcessorManager:
         )
         await db.execute(stmt)
 
+    async def _bulk_delete_documents(self, db: AsyncSession, doc_ids: List[int]):
+        if not doc_ids:
+            logger.info("no document statuses to update")
+            return
+
+        stmt = delete(KnowledgeBaseDocument).where(
+            KnowledgeBaseDocument.id.in_(doc_ids)
+        )
+
+        await db.execute(stmt)
+
     async def process_message(self, message: ReceivedSqsMessage):
         logger.info("initiating processing message")
         try:
-            all_results = await self._process_tasks_concurrently(message=message)
+            job_failed = False
+            indexing_results, deletion_results = await self._process_tasks_concurrently(
+                message=message
+            )
             logger.info("indexing and reindexing is completed")
 
-            exceptions = [res for res in all_results if isinstance(res, Exception)]
+            exceptions = [
+                res
+                for res in indexing_results + deletion_results
+                if isinstance(res, Exception)
+            ]
+
             if exceptions:
+                job_failed = True
                 for exc in exceptions:
                     logger.error(
-                        f"An exception occurred during concurrent execution: {exc}",
+                        f"An exception occurred during concurrent execution for job {message.body.ingestion_job_id}: {exc}",
                         exc_info=exc,
                     )
-                raise exceptions[0]
-
-            processed_items = itertools.chain.from_iterable(
-                response for response in all_results if isinstance(response, list)
-            )
 
             async with SessionLocal() as db:
-                if processed_items:
+                updates_to_perform = [
+                    res for res in indexing_results if isinstance(res, tuple)
+                ]
+                if updates_to_perform:
                     await self._bulk_update_document_statuses(
-                        db=db, results=processed_items
+                        db=db, results=updates_to_perform
                     )
 
+                deletion_to_perform = [
+                    res for res in deletion_results if isinstance(res, tuple)
+                ]
+                if deletion_to_perform:
+                    ids_to_delete = [
+                        doc_id
+                        for doc_id, status in deletion_to_perform
+                        if status == OperationStatusEnum.SUCCESS
+                    ]
+                    failed_deletion = [
+                        (doc_id, status)
+                        for doc_id, status in deletion_to_perform
+                        if status == OperationStatusEnum.FAILED
+                    ]
+
+                    if ids_to_delete:
+                        await self._bulk_delete_documents(db=db, doc_ids=ids_to_delete)
+
+                    if failed_deletion:
+                        await self._bulk_update_document_statuses(
+                            db=db, results=failed_deletion
+                        )
+                        job_failed = True
+
+                final_job_status = (
+                    OperationStatusEnum.FAILED
+                    if job_failed
+                    else OperationStatusEnum.SUCCESS
+                )
                 await self._set_ingestion_job_status(
                     db=db,
                     job_id=message.body.ingestion_job_id,
-                    status=OperationStatusEnum.SUCCESS,
+                    status=final_job_status,
                 )
 
                 await db.commit()
+
                 logger.info(
-                    f"database updates for job {message.body.ingestion_job_id} committed successfully"
+                    f"Database updates for job {message.body.ingestion_job_id} committed with final status: {final_job_status.name}"
                 )
 
         except Exception as e:

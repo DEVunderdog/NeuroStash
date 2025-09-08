@@ -25,10 +25,8 @@ logger = logging.getLogger(__name__)
 class InvalidFileExtension(Exception):
     pass
 
-
 class DocumentNotLoaded(Exception):
     pass
-
 
 class DocumentNotChunked(Exception):
     pass
@@ -116,7 +114,7 @@ class IngestData:
         async def reindexing_with_limit(file: FileForIngestion, collection_name: str):
             async with semaphore:
                 try:
-                    await self._process_reindexing(
+                    self._process_reindexing(
                         file=file, collection_name=collection_name
                     )
                     logger.info("successfully deleted from milvus")
