@@ -152,3 +152,18 @@ async def create_ingestion_job(
             exc_info=True,
         )
         raise
+
+
+async def get_ingestion_job_status(
+    *, db: AsyncSession, ingestion_job_id: int, user_id: int
+) -> OperationStatusEnum:
+
+    stmt = select(IngestionJob.op_status).where(
+        IngestionJob.id == ingestion_job_id, user_id == user_id
+    )
+
+    result = await db.execute(stmt)
+
+    status = result.scalar()
+
+    return status

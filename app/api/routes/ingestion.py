@@ -1,14 +1,21 @@
 import logging
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from app.dao.models import StandardResponse, IngestionRequest, SqsMessage
+from app.dao.models import (
+    StandardResponse,
+    IngestionRequest,
+    SqsMessage,
+    IngestionJobStatusResponse,
+    CreatedIngestionJob,
+    IngestionJobStatusRequest,
+)
 from app.api.deps import SessionDep, TokenPayloadDep, AwsDep
 from app.dao.ingestion_dao import (
     create_ingestion_job,
+    get_ingestion_job_status,
     KnowledgeBaseNotFound,
     DocsNotFound,
 )
-from app.dao.models import CreatedIngestionJob
 from app.aws.client import SqsMessageError
 
 router = APIRouter(prefix="/ingestion", tags=["Data Ingestion"])
@@ -189,3 +196,29 @@ async def delete_ingested_data(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred while starting the ingestion job.",
         )
+
+
+@router.get(
+    "/status",
+    response_model=IngestionJobStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="ingestion job status",
+)
+async def ingestion_job_status(
+    req: IngestionJobStatusRequest,
+    db: SessionDep,
+    payload: TokenPayloadDep,
+):
+    job_status = await get_ingestion_job_status(
+        db=db, ingestion_job_id=req.ingestion_job_id, user_id=payload.user_id
+    )
+
+    if job_status is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"cannot find ingestion job with provided id: {req.ingestion_job_id}",
+        )
+
+    return IngestionJobStatusResponse(
+        message="successfully fetched the job status", status=job_status.value
+    )

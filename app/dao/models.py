@@ -217,6 +217,14 @@ class IngestionRequest(BaseModel):
         }
 
 
+class IngestionJobStatusRequest(BaseModel):
+    ingestion_job_id: int
+
+
+class IngestionJobStatusResponse(StandardResponse):
+    status: str
+
+
 class CreatedIngestionJob(BaseModel):
     ingestion_id: int
     collection_name: str
