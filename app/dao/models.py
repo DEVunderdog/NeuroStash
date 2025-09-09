@@ -247,3 +247,10 @@ class ListKbDocs(StandardResponse):
     knowledge_base_id: int
     total_count: int
     knowledge_base_id: int
+
+
+class PoolStats(StandardResponse):
+    available: int
+    assigned: int
+    failed: int
+    cleanup: int
