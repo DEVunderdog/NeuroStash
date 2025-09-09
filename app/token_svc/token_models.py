@@ -1,7 +1,8 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 from app.dao.schema import ClientRoleEnum
+from app.utils.application_timezone import get_current_time
 
 
 class PayloadData(BaseModel):
@@ -24,6 +25,7 @@ class KeyInfo:
         self.expires_at = expires_at
 
     def is_expired(self) -> bool:
-        if self.expires_at and datetime.now(timezone.utc) > self.expires_at:
+        current_time = get_current_time()
+        if self.expires_at and current_time > self.expires_at:
             return True
         return False

@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.dao.schema import EncryptionKey
-from datetime import datetime, timezone
 from typing import List
+from app.utils.application_timezone import get_current_time
 
 
 async def get_active_encryption_key(*, db: AsyncSession) -> EncryptionKey | None:
@@ -13,7 +13,7 @@ async def get_active_encryption_key(*, db: AsyncSession) -> EncryptionKey | None
 
 
 async def get_other_encryption_keys(*, db: AsyncSession) -> List[EncryptionKey]:
-    now = datetime.now(timezone.utc)
+    now = get_current_time()
     stmt = select(EncryptionKey).where(
         (EncryptionKey.expired_at.is_(None)) | (EncryptionKey.expired_at > now)
     )

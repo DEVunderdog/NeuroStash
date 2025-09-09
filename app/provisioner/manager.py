@@ -2,7 +2,7 @@ import asyncio
 import logging
 from sqlalchemy import select, func, and_, or_, case, delete
 from app.core.db import SessionLocal
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta
 from app.milvus.client import MilvusOps
 from app.core.config import Settings
 from app.constants.globals import (
@@ -150,7 +150,7 @@ class ProvisionManager:
                 except Exception as e:
                     logger.error(f"failed to provision new index: {e}", exc_info=True)
                     raise
-        
+
         exceptions = None
         try:
             async with asyncio.TaskGroup() as tg:
@@ -216,7 +216,8 @@ class ProvisionManager:
     async def get_cleanup_collections(self):
         try:
             async with SessionLocal() as db:
-                stuck_threshold = datetime.now(timezone.utc) - timedelta(minutes=10)
+                current_time = get_current_time()
+                stuck_threshold = current_time - timedelta(minutes=10)
 
                 failed_collection = (
                     MilvusCollections.status == ProvisionerStatusEnum.FAILED
@@ -292,7 +293,6 @@ class ProvisionManager:
             raise exceptions
         else:
             logger.info("Successfully finished collections cleanup cycle.")
-
 
     async def _cleanup_one_collection(
         self, collection: MilvusCollections, sem: asyncio.Semaphore

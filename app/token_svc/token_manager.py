@@ -5,7 +5,7 @@ from app.token_svc.token_models import (
     TokenData,
 )
 from app.core.config import Settings
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta
 from jose import JWTError, jwt
 from jose.constants import ALGORITHMS
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,7 @@ from app.dao.encryption_keys_dao import (
     create_encryption_key,
 )
 from app.token_svc.symmetric_key import generate_symmetric_key
+from app.utils.application_timezone import get_current_time
 from app.core.db import SessionLocal
 import secrets
 import logging
@@ -52,7 +53,9 @@ class TokenManager:
             instance._active_key_config = await instance._build_active_key_tuple(db=db)
 
         if instance._active_key_config is None:
-            raise RuntimeError("Failed to initialize TokenManager with encryption keys.")
+            raise RuntimeError(
+                "Failed to initialize TokenManager with encryption keys."
+            )
 
         return instance
 
@@ -129,9 +132,11 @@ class TokenManager:
 
         to_encode = payload_data.model_dump(mode="json", exclude_unset=True)
         if expires_delta:
-            expire = datetime.now(timezone.utc) + expires_delta
+            current_time = get_current_time()
+            expire = current_time + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(
+            current_time = get_current_time()
+            expire = current_time + timedelta(
                 hours=self.settings.JWT_ACCESS_TOKEN_HOURS
             )
 
@@ -140,7 +145,7 @@ class TokenManager:
                 "exp": expire,
                 "iss": self.settings.JWT_ISSUER,
                 "aud": self.settings.JWT_AUDIENCE,
-                "iat": datetime.now(timezone.utc),
+                "iat": get_current_time(),
                 "jti": os.urandom(16).hex(),
             }
         )
