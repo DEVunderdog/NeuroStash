@@ -1,6 +1,6 @@
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, delete
+from sqlalchemy import select, insert, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
@@ -174,9 +174,13 @@ async def get_ingestion_job_status(
 async def cleanup_ingestion_job(*, db: AsyncSession):
     current_time = get_current_time()
     cutoff_time = current_time - timedelta(hours=1)
-    stmt = delete(IngestionJob).where(
-        IngestionJob.op_status == OperationStatusEnum.PENDING,
-        IngestionJob.updated_at < cutoff_time,
+    stmt = (
+        update(IngestionJob)
+        .where(
+            IngestionJob.op_status == OperationStatusEnum.PENDING,
+            IngestionJob.updated_at < cutoff_time,
+        )
+        .values(op_status=OperationStatusEnum.FAILED)
     )
 
     await db.execute(stmt)

@@ -7,7 +7,9 @@ from app.dao.schema import MilvusCollections, ProvisionerStatusEnum
 logger = logging.getLogger(__name__)
 
 
-async def get_collection_pool_stats(*, db: AsyncSession) -> PoolStats:
+async def get_collection_pool_stats(
+    *, db: AsyncSession, collections_count: int
+) -> PoolStats:
     try:
         stmt = select(
             func.count(
@@ -46,6 +48,7 @@ async def get_collection_pool_stats(*, db: AsyncSession) -> PoolStats:
             assigned=row.assigned,
             cleanup=row.cleanup,
             failed=row.failed,
+            remote_collections=collections_count,
         )
 
     except Exception as e:

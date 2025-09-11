@@ -254,3 +254,4 @@ class PoolStats(StandardResponse):
     assigned: int
     failed: int
     cleanup: int
+    remote_collections: int

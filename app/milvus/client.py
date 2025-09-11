@@ -91,7 +91,7 @@ class MilvusOps:
                 datatype=DataType.VARCHAR,
                 nullable=False,
                 max_length=65535,
-                enable_analyzer=True
+                enable_analyzer=True,
             )
             schema.add_field(
                 field_name="user_id",
@@ -193,4 +193,12 @@ class MilvusOps:
             logger.error(
                 f"error deleting entities collection record: {e}", exc_info=True
             )
+            raise
+
+    def list_collections(self):
+        try:
+            res = self.client.list_collections()
+            return res
+        except Exception as e:
+            logger.error(f"error listing collections from milvus: {e}")
             raise

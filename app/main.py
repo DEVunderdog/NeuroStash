@@ -97,8 +97,8 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         schedule_cleanup_job,
         "cron",
-        hour=2,
-        minute=0,
+        hour=8,
+        minute=3,
         name="daily_collection_cleanup",
         args=[provision_manager, file_cleaner],
     )

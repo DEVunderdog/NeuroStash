@@ -343,3 +343,11 @@ class ProvisionManager:
                 logger.error(
                     f"cleanup cycle failed with an exception: {e}", exc_info=True
                 )
+
+    def get_list_of_collections(self):
+        try:
+            res = self.milvusOps.list_collections()
+            return res
+        except Exception as e:
+            logger.error(f"{e}")
+            raise
