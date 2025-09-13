@@ -1,7 +1,14 @@
-from pymilvus import MilvusClient, DataType, Function, FunctionType
+from pymilvus import (
+    MilvusClient,
+    DataType,
+    Function,
+    FunctionType,
+    AnnSearchRequest,
+)
 from app.core.config import Settings
 from app.constants.globals import MODEL_DIMENSION
 from app.milvus.entity import CollectionSchemaEntity, auto_generated_fields
+from app.milvus.entity import SearchingConfiguration
 from typing import List
 from dataclasses import asdict
 import logging
@@ -10,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 class MilvusOps:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, search_config: SearchingConfiguration):
         self.settings = settings
+        self.search_config = search_config
         token = None
 
         if self.settings.MILVUS_USER and self.settings.MILVUS_PASSWORD:
@@ -201,4 +209,54 @@ class MilvusOps:
             return res
         except Exception as e:
             logger.error(f"error listing collections from milvus: {e}")
+            raise
+
+    def hybrid_search(
+        self,
+        collection_name: str,
+        query: str,
+        generated_embeddings: List[float],
+        limit: int = 10,
+    ):
+        try:
+            hnsw_search_params = {
+                "data": [generated_embeddings],
+                "anns_field": "text_dense_vector",
+                "param": {"ef": self.search_config.hnsw_ef},
+                "limit": limit,
+            }
+
+            sparse_search_params = {
+                "data": [query],
+                "anns_field": "text_sparse_vector",
+                "param": {"drop_ratio_search": self.search_config.sparse_drop_ratio},
+                "limit": limit,
+            }
+
+            hnsw_search_request = AnnSearchRequest(**hnsw_search_params)
+            sparse_search_request = AnnSearchRequest(**sparse_search_params)
+
+            all_requests = [hnsw_search_request, sparse_search_request]
+
+            ranker = Function(
+                name="rrf",
+                input_field_names=[],
+                function_type=FunctionType.RERANK,
+                params={
+                    "reranker": "rrf",
+                    "k": self.search_config.reranker_smoothing_parameter,
+                },
+            )
+
+            response = self.client.hybrid_search(
+                collection_name=collection_name,
+                reqs=all_requests,
+                ranker=ranker,
+                limit=limit,
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"error performing hybrid search remotely: {e}", exc_info=True)
             raise
