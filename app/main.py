@@ -13,6 +13,7 @@ from app.file_cleaner.cleaner import FileCleaner
 from app.milvus.client import MilvusOps
 from app.utils.scheduler import scheduler
 from app.core.exceptions import request_validation_exception_handler
+from app.milvus.searching import SearchOps
 
 import logging
 import sys
@@ -82,6 +83,10 @@ async def lifespan(app: FastAPI):
     provision_manager = ProvisionManager(
         settings=settings, milvusOps=app.state.milvus_ops
     )
+
+    search_ops = SearchOps(settings=settings)
+
+    app.state.search_ops = search_ops
 
     app.state.provision_manager = provision_manager
 

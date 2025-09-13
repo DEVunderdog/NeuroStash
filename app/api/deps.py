@@ -9,6 +9,7 @@ from jose import JWTError, ExpiredSignatureError
 from app.provisioner.manager import ProvisionManager
 from app.dao.api_keys_dao import get_api_key_for_verification
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.milvus.searching import SearchOps
 
 
 oauth2_scheme = HTTPBearer(auto_error=False)
@@ -44,10 +45,17 @@ def get_provision_manager(request: Request) -> ProvisionManager:
     return request.app.state.provision_manager
 
 
+def get_search_ops(request: Request) -> SearchOps:
+    if not hasattr(request.app.state, "search_ops"):
+        raise RuntimeError("SearchOps not initialized. Check lifespan events")
+    return request.app.search_ops
+
+
 SessionDep = Annotated[AsyncSession, Depends(get_db)]
 TokenDep = Annotated[TokenManager, Depends(get_token_manager)]
 AwsDep = Annotated[AwsClientManager, Depends(get_aws_client_manager)]
 ProvisionDep = Annotated[ProvisionManager, Depends(get_provision_manager)]
+SearchOpsDep = Annotated[SearchOps, Depends(get_search_ops)]
 
 
 async def get_token_payload(

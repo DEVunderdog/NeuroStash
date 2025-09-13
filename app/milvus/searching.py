@@ -26,10 +26,20 @@ class SearchOps:
             )
             raise
 
-    def _perform_hybrid_search(self, collection_name:str, query: str, limit: int):
+    def perform_hybrid_search(self, collection_name: str, query: str, limit: int):
         try:
+            search_limit = None
+            if limit == 0:
+                search_limit = 10
+            else:
+                search_limit = limit
             generated_embeddings = self.__generate_query_embeddings(query=query)
-            search_response = self.milvus_ops.hybrid_search(collection_name=collection_name, query=query, generated_embeddings=generated_embeddings)
+            search_response = self.milvus_ops.hybrid_search(
+                collection_name=collection_name,
+                query=query,
+                generated_embeddings=generated_embeddings,
+                limit=search_limit,
+            )
 
             return search_response
         except Exception as e:

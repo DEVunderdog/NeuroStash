@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError, NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound, SQLAlchemyError
 from sqlalchemy import select, func
 from app.dao.models import CreateKbInDb, ListKbDocs, KbDoc
 from app.dao.schema import (
@@ -19,6 +19,12 @@ class KnowledgeBaseAlreadyExists(Exception):
     def __init__(self, knowledg_base_name: str):
         self.kb = knowledg_base_name
         super().__init__(f"knowledge with name '{knowledg_base_name}' already exists")
+
+
+class KnowledgeBaseNotFound(Exception):
+    def __init__(self, kb_id: int):
+        self.kb_id = kb_id
+        super().__init__(f"knowledge base with id {kb_id} not found")
 
 
 async def create_kb_db(*, db: AsyncSession, kb: CreateKbInDb) -> KnowledgeBase:
@@ -67,6 +73,24 @@ async def create_kb_db(*, db: AsyncSession, kb: CreateKbInDb) -> KnowledgeBase:
         raise RuntimeError(f"failed to create knowledge base in database: {e}")
 
 
+async def get_kb_collection(*, db: AsyncSession, user_id, kb_id: int) -> str:
+    try:
+        stmt = (
+            select(MilvusCollections.collection_name)
+            .join(KnowledgeBase, KnowledgeBase.collection_id == MilvusCollections.id)
+            .where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == user_id)
+        )
+
+        result = await db.execute(stmt)
+        collection_name = result.scalar_one()
+
+        return collection_name
+    except NoResultFound:
+        raise KnowledgeBaseNotFound(kb_id=kb_id)
+    except SQLAlchemyError:
+        raise
+
+
 async def list_users_kb(
     *, db: AsyncSession, limit: int = 100, offset: int = 0, user_id: int
 ) -> Tuple[List[KnowledgeBase], int]:
@@ -96,7 +120,7 @@ async def list_kb_docs(
             DocumentRegistry.id,
             DocumentRegistry.file_name,
             KnowledgeBaseDocument.id.label("kb_doc_id"),
-            KnowledgeBaseDocument.status
+            KnowledgeBaseDocument.status,
         )
         .join(
             KnowledgeBaseDocument,
@@ -122,7 +146,12 @@ async def list_kb_docs(
     result = await db.execute(query)
 
     docs = [
-        KbDoc(kb_doc_id=row.kb_doc_id, doc_id=row.id, file_name=row.file_name, status=row.status.value)
+        KbDoc(
+            kb_doc_id=row.kb_doc_id,
+            doc_id=row.id,
+            file_name=row.file_name,
+            status=row.status.value,
+        )
         for row in result.all()
     ]
 

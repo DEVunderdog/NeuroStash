@@ -255,3 +255,13 @@ class PoolStats(StandardResponse):
     failed: int
     cleanup: int
     remote_collections: int
+
+
+class SearchRequest(BaseModel):
+    knowledge_base_id: int
+    search_limit: int
+    user_query: str
+
+
+class SearchResponse(StandardResponse):
+    response: List[List[dict]]
