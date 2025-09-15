@@ -89,6 +89,8 @@ async def get_kb_collection(*, db: AsyncSession, user_id, kb_id: int) -> str:
         raise KnowledgeBaseNotFound(kb_id=kb_id)
     except SQLAlchemyError:
         raise
+    except Exception:
+        raise
 
 
 async def list_users_kb(

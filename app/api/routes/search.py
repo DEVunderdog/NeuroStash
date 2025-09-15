@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, status, HTTPException
 from app.api.deps import SearchOpsDep, SessionDep, TokenPayloadDep
-from app.dao.models import SearchResponse, SearchRequest, StandardResponse
+from app.dao.models import SearchResponse, SearchRequest
 from app.dao.knowledge_base_dao import get_kb_collection, KnowledgeBaseNotFound
 
 router = APIRouter(prefix="/search", tags=["document retrieval"])
@@ -44,13 +44,3 @@ async def search(
 
     except KnowledgeBaseNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e)
-
-
-@router.post(
-    "/batch",
-    response_model=StandardResponse,
-    status_code=status.HTTP_200_OK,
-    summary="batch searching jobs",
-)
-async def batch_search():
-    pass

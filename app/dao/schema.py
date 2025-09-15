@@ -16,6 +16,7 @@ from sqlalchemy import (
     Index,
     UniqueConstraint,
     text,
+    Text,
     Identity,
 )
 from sqlalchemy.dialects.postgresql import UUID as pg_uuid
@@ -278,6 +279,7 @@ class SearchingBatchJobs(Base, TimestampMixin):
         ForeignKey("user_clients.id", onupdate="CASCADE", ondelete="RESTRICT"),
         nullable=False,
     )
+    search_query: Mapped[str] = mapped_column(Text, nullable=False)
     op_status: Mapped[OperationStatusEnum] = mapped_column(
         SQLEnum(OperationStatusEnum, name="operation_status", create_type=False),
         nullable=False,
