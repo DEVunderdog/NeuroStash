@@ -7,6 +7,7 @@ from sqlalchemy import (
     Column,
     ForeignKey,
     Integer,
+    BigInteger,
     String,
     Boolean,
     LargeBinary,
@@ -103,7 +104,7 @@ class UserClient(Base, TimestampMixin):
 class ApiKey(Base, TimestampMixin):
     __tablename__ = "api_keys"
 
-    id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user_clients.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
@@ -129,7 +130,7 @@ class ApiKey(Base, TimestampMixin):
 class DocumentRegistry(Base, TimestampMixin):
     __tablename__ = "documents_registry"
 
-    id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user_clients.id", onupdate="CASCADE", ondelete="RESTRICT"),
         nullable=False,
@@ -211,7 +212,7 @@ class KnowledgeBase(Base, TimestampMixin):
 class KnowledgeBaseDocument(Base, TimestampMixin):
     __tablename__ = "knowledge_base_documents"
 
-    id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     knowledge_base_id: Mapped[int] = mapped_column(
         ForeignKey("knowledge_bases.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
@@ -247,7 +248,7 @@ class KnowledgeBaseDocument(Base, TimestampMixin):
 class IngestionJob(Base, TimestampMixin):
     __tablename__ = "ingestion_jobs"
 
-    id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     kb_id: Mapped[int] = mapped_column(
         ForeignKey("knowledge_bases.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
@@ -267,3 +268,25 @@ class IngestionJob(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<IngestionJob(id={self.id}, kb_id={self.kb_id}, status='{self.op_status.value}')>"
+
+
+class SearchingBatchJobs(Base, TimestampMixin):
+    __tablename__ = "searching_batch_jobs"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user_clients.id", onupdate="CASCADE", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    op_status: Mapped[OperationStatusEnum] = mapped_column(
+        SQLEnum(OperationStatusEnum, name="operation_status", create_type=False),
+        nullable=False,
+        server_default=OperationStatusEnum.PENDING.value,
+    )
+
+    user_client: Mapped["UserClient"] = relationship(
+        back_populates="searching_batch_jobs"
+    )
+
+    def __repr__(self):
+        return f"<SearchingBatchJOb(id='{self.id}', user_id='{self.user_id}', op_status='{self.op_status}')"
