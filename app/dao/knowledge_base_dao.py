@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, NoResultFound, SQLAlchemyError
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from app.dao.models import CreateKbInDb, ListKbDocs, KbDoc
 from app.dao.schema import (
     KnowledgeBase,
@@ -182,6 +182,11 @@ async def delete_kb_db(*, db: AsyncSession, user_id: int, kb_id: int) -> bool:
                 raise RuntimeError(
                     f"inconsistent state: KnowledgeBase {kb_id} has no associated milvus collections"
                 )
+            await db.execute(
+                delete(KnowledgeBaseDocument).where(
+                    KnowledgeBaseDocument.knowledge_base_id == kb_id
+                )
+            )
             await db.delete(kb)
         return True
     except NoResultFound:

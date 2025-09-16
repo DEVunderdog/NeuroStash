@@ -226,7 +226,7 @@ async def delete_file(
     summary="cleanup successful",
 )
 async def cleanup_files(db: SessionDep, payload: TokenPayloadDep, aws_client: AwsDep):
-    conflicting_docs = await conflicted_docs(db=db, user_id=payload.user_id)
+    conflicting_docs = await conflicted_docs(db=db)
 
     if not conflicting_docs:
         return StandardResponse(message="none conflicting files found")

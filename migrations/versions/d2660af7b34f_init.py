@@ -1,8 +1,8 @@
 """init
 
-Revision ID: f17fc4f79f88
+Revision ID: d2660af7b34f
 Revises:
-Create Date: 2025-09-15 11:01:07.671401
+Create Date: 2025-09-15 12:00:53.781195
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "f17fc4f79f88"
+revision: str = "d2660af7b34f"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -325,7 +325,6 @@ def downgrade() -> None:
     )
     op.drop_table("encryption_keys")
     # ### end Alembic commands ###
-
     op.execute("DROP TYPE IF EXISTS provisioner_status CASCADE")
     op.execute("DROP TYPE IF EXISTS operation_status CASCADE")
     op.execute("DROP TYPE IF EXISTS client_roles CASCADE")

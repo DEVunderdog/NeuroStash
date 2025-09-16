@@ -30,9 +30,6 @@ async def get_pool_stats(
         collections_count = len(res)
         
         pool_stats = await get_collection_pool_stats(db=db, collections_count=collections_count)
-
-        logger.info(f"response: {res}")
-
         return pool_stats
     except Exception as e:
         raise HTTPException(

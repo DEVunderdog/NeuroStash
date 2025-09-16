@@ -97,6 +97,9 @@ class UserClient(Base, TimestampMixin):
     knowledge_bases: Mapped[List["KnowledgeBase"]] = relationship(
         back_populates="user_client"
     )
+    searching_batch_jobs: Mapped[List["SearchingBatchJobs"]] = relationship(
+        back_populates="user_client"
+    )
 
     def __repr__(self) -> str:
         return f"<UserClient(id={self.id}, email='{self.email}', role='{self.role.value}')>"

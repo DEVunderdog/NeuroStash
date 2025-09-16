@@ -8,7 +8,7 @@ from pymilvus import (
 from app.core.config import Settings
 from app.constants.globals import MODEL_DIMENSION
 from app.milvus.entity import CollectionSchemaEntity, auto_generated_fields
-from app.milvus.entity import SearchingConfiguration
+from app.milvus.entity import get_global_searching_configuration, SearchingConfiguration
 from typing import List
 from dataclasses import asdict
 import logging
@@ -17,9 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 class MilvusOps:
-    def __init__(self, settings: Settings, search_config: SearchingConfiguration):
+    def __init__(self, settings: Settings):
         self.settings = settings
-        self.search_config = search_config
+        self.search_config: SearchingConfiguration = (
+            get_global_searching_configuration()
+        )
         token = None
 
         if self.settings.MILVUS_USER and self.settings.MILVUS_PASSWORD:
@@ -31,6 +33,7 @@ class MilvusOps:
         databases = self.get_database(name=name)
         if name not in databases:
             self.create_database(name=name)
+
         self.client.use_database(db_name=name)
 
     def create_database(self, name: str):
@@ -253,6 +256,14 @@ class MilvusOps:
                 reqs=all_requests,
                 ranker=ranker,
                 limit=limit,
+                output_fields=[
+                    "category",
+                    "object_key",
+                    "file_name",
+                    "text_content",
+                    "file_id",
+                    "user_id",
+                ],
             )
 
             return response

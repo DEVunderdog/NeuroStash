@@ -54,7 +54,6 @@ async def create_admin_user(db_session: AsyncSession) -> None:
         logger.info("initializing aws and token manager clients")
         aws_client_manager = AwsClientManager(settings=settings)
         token_manager = await TokenManager.create(
-            initial_db_session=db_session,
             aws_client_manager=aws_client_manager,
             settings=settings,
         )

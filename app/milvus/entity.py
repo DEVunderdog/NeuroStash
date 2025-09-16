@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 from typing import Optional, List, Dict
 from pydantic import BaseModel
+from app.constants.globals import (
+    HNSW_EF,
+    SPARSE_DROP_RATIO,
+    RERANKER_SMOOTHING_PARAMETERS,
+)
 
 
 @dataclass
@@ -17,9 +22,17 @@ class CollectionSchemaEntity:
 
 
 class SearchingConfiguration(BaseModel):
-    hnsw_ef: int
-    sparse_drop_ratio: float
-    reranker_smoothing_parameter: int
+    hnsw_ef: int = 10
+    sparse_drop_ratio: float = 0.2
+    reranker_smoothing_parameter: int = 60
 
 
 auto_generated_fields = {"text_sparse_vector"}
+
+
+def get_global_searching_configuration() -> SearchingConfiguration:
+    return SearchingConfiguration(
+        hnsw_ef=HNSW_EF,
+        sparse_drop_ratio=SPARSE_DROP_RATIO,
+        reranker_smoothing_parameter=RERANKER_SMOOTHING_PARAMETERS,
+    )

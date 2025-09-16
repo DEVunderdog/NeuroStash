@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 class InvalidFileExtension(Exception):
     pass
 
+
 class DocumentNotLoaded(Exception):
     pass
+
 
 class DocumentNotChunked(Exception):
     pass
@@ -114,9 +116,7 @@ class IngestData:
         async def reindexing_with_limit(file: FileForIngestion, collection_name: str):
             async with semaphore:
                 try:
-                    self._process_reindexing(
-                        file=file, collection_name=collection_name
-                    )
+                    self._process_reindexing(file=file, collection_name=collection_name)
                     logger.info("successfully deleted from milvus")
                     return (file.kb_doc_id, OperationStatusEnum.SUCCESS)
                 except Exception as e:
@@ -232,10 +232,16 @@ class IngestData:
         try:
             chunked_doc, embeddings = await self._process_file(file=file)
 
+            logger.info(f"\nlength of chunked_doc: {len(chunked_doc)}")
+            logger.info(f"\nlength of embeddings: {len(embeddings)}")
+
             data_for_milvus: List[CollectionSchemaEntity] = []
 
-            for doc, embedding in zip(chunked_doc, embeddings):
-                id = generate_deterministic_uuid(name=file.file_name, id=file.kb_doc_id)
+            for index, (doc, embedding) in enumerate(zip(chunked_doc, embeddings)):
+                unique_chunk_name = f"{file.file_name}-{index}"
+                id = generate_deterministic_uuid(
+                    name=unique_chunk_name, id=file.kb_doc_id
+                )
                 entity = CollectionSchemaEntity(
                     id=id,
                     text_dense_vector=embedding,

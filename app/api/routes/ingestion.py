@@ -8,6 +8,7 @@ from app.dao.models import (
     IngestionJobStatusResponse,
     CreatedIngestionJob,
     IngestionJobStatusRequest,
+    IngestionJobCreationResponse,
 )
 from app.api.deps import SessionDep, TokenPayloadDep, AwsDep
 from app.dao.ingestion_dao import (
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @router.post(
     "/insert",
-    response_model=StandardResponse,
+    response_model=IngestionJobCreationResponse,
     status_code=status.HTTP_200_OK,
     summary="initialize the ingestion of data from documents",
 )
@@ -71,8 +72,9 @@ async def ingest_documents(
 
         await db.commit()
 
-        return StandardResponse(
-            message=f"successfully requested ingestion for {len(result.documents)} documents"
+        return IngestionJobCreationResponse(
+            message=f"successfully requested ingestion for {len(result.documents)} documents",
+            ingestion_job_id=result.ingestion_id,
         )
 
     except KnowledgeBaseNotFound as e:
@@ -99,16 +101,6 @@ async def ingest_documents(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"coudl not queue ingestion job: {e}",
-        )
-
-    except Exception:
-        await db.rollback()
-        logger.error(
-            "Error creating ingestion job and sending SQS message", exc_info=True
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred while starting the ingestion job.",
         )
 
 

@@ -45,3 +45,5 @@ class SearchOps:
         except Exception as e:
             logger.error(f"error performing hybrid search: {e}", exc_info=True)
             raise
+
+    

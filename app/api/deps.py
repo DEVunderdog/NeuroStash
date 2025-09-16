@@ -48,7 +48,7 @@ def get_provision_manager(request: Request) -> ProvisionManager:
 def get_search_ops(request: Request) -> SearchOps:
     if not hasattr(request.app.state, "search_ops"):
         raise RuntimeError("SearchOps not initialized. Check lifespan events")
-    return request.app.search_ops
+    return request.app.state.search_ops
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_db)]

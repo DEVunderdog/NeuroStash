@@ -80,6 +80,8 @@ async def lifespan(app: FastAPI):
     app.state.aws_client_manager = AwsClientManager(settings=settings)
     app.state.milvus_ops = MilvusOps(settings=settings)
 
+    app.state.milvus_ops.ensure_database(name=settings.MILVUS_DATABASE)
+
     provision_manager = ProvisionManager(
         settings=settings, milvusOps=app.state.milvus_ops
     )

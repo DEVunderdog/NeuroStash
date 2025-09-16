@@ -212,9 +212,12 @@ class IngestionRequest(BaseModel):
             "example": {
                 "kb_id": 5,
                 "file_ids": [1, 5, 6],
-                "retry_kb_doc_ids": [1, 6, 9, 13],
             }
         }
+
+
+class IngestionJobCreationResponse(StandardResponse):
+    ingestion_job_id: int
 
 
 class IngestionJobStatusRequest(BaseModel):
