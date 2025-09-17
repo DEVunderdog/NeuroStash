@@ -57,6 +57,13 @@ class ProvisionerStatusEnum(enum.Enum):
     FAILED = "FAILED"
 
 
+class SearchMethodEnum(enum.Enum):
+    FLAT = "FLAT"
+    HNSW = "HNSW"
+    IVF_SQ8 = "IVF_SQ8"
+    DiskANN = "DiskANN"
+
+
 class EncryptionKey(Base, TimestampMixin):
     __tablename__ = "encryption_keys"
 
@@ -171,6 +178,10 @@ class MilvusCollections(Base, TimestampMixin):
         SQLEnum(ProvisionerStatusEnum, name="provisioner_status", create_type=False),
         nullable=False,
         server_default=ProvisionerStatusEnum.PROVISIONING.value,
+    )
+    search_method: Mapped[SearchMethodEnum] = mapped_column(
+        SQLEnum(SearchMethodEnum, name="search_category", create_type=False),
+        nullable=False,
     )
 
     knowledge_bases: Mapped[List["KnowledgeBase"]] = relationship(

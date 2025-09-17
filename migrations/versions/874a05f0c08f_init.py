@@ -1,8 +1,8 @@
 """init
 
-Revision ID: d2660af7b34f
+Revision ID: 874a05f0c08f
 Revises:
-Create Date: 2025-09-15 12:00:53.781195
+Create Date: 2025-09-17 23:46:40.288702
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "d2660af7b34f"
+revision: str = "874a05f0c08f"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -67,6 +67,11 @@ def upgrade() -> None:
                 name="provisioner_status",
             ),
             server_default="PROVISIONING",
+            nullable=False,
+        ),
+        sa.Column(
+            "search_method",
+            sa.Enum("FLAT", "HNSW", "IVF_SQ8", "DiskANN", name="search_category"),
             nullable=False,
         ),
         sa.Column(
@@ -328,3 +333,4 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS provisioner_status CASCADE")
     op.execute("DROP TYPE IF EXISTS operation_status CASCADE")
     op.execute("DROP TYPE IF EXISTS client_roles CASCADE")
+    op.execute("DROP TYPE IF EXISTS search_category CASCADE")
