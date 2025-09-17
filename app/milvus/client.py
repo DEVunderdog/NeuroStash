@@ -9,6 +9,7 @@ from app.core.config import Settings
 from app.constants.globals import MODEL_DIMENSION
 from app.milvus.entity import CollectionSchemaEntity, auto_generated_fields
 from app.milvus.entity import get_global_searching_configuration, SearchingConfiguration
+from app.dao.schema import SearchMethodEnum
 from typing import List
 from dataclasses import asdict
 import logging
@@ -60,7 +61,9 @@ class MilvusOps:
             logger.error("error droping milvus database", exc_info=True)
             raise
 
-    def create_collection(self, collection_name: str):
+    def create_collection(
+        self, collection_name: str, collection_type: SearchMethodEnum
+    ):
         try:
             schema = self.client.create_schema()
             schema.add_field(
@@ -126,14 +129,31 @@ class MilvusOps:
 
             index_params = self.client.prepare_index_params()
 
-            index_params.add_index(
-                field_name="text_dense_vector",
-                index_name="text_dense_index",
-                index_type="HNSW",
-                metric_type="COSINE",
-                params={"M": 32, "efConstruction": 400},
-            )
-
+            if collection_type == SearchMethodEnum.HNSW:
+                index_params.add_index(
+                    field_name="text_dense_vector",
+                    index_name="text_dense_index",
+                    index_type="HNSW",
+                    metric_type="COSINE",
+                    params={"M": 32, "efConstruction": 400},
+                )
+            elif collection_type == SearchMethodEnum.FLAT:
+                index_params.add_index(
+                    field_name="text_dense_vector",
+                    index_name="text_dense_index",
+                    index_type="FLAT",
+                    metric_type="COSINE",
+                    params={},
+                )
+            elif collection_type == SearchMethodEnum.IVF_SQ8:
+                index_params.add_index(
+                    field_name="text_dense_vector",
+                    index_name="text_dense_index",
+                    index_type="IVF_SQ8",
+                    metric_type="COSINE",
+                    params={"nlist": 128},
+                )
+            
             index_params.add_index(
                 field_name="text_sparse_vector",
                 index_name="text_sparse_index",

@@ -61,7 +61,6 @@ class SearchMethodEnum(enum.Enum):
     FLAT = "FLAT"
     HNSW = "HNSW"
     IVF_SQ8 = "IVF_SQ8"
-    DiskANN = "DiskANN"
 
 
 class EncryptionKey(Base, TimestampMixin):
