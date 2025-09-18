@@ -6,14 +6,21 @@ from datetime import timedelta
 from app.milvus.client import MilvusOps
 from app.core.config import Settings
 from app.constants.globals import (
-    MIN_POOL_SIZE,
-    MAX_POOL_SIZE,
+    POOL_FLAT,
+    POOL_HNSW,
+    POOL_IVF_SQ8,
+    TOTAL_POOL_SIZE,
     TIME_THRESHOLD,
     MAX_CONCURRENT_PROVISIONER,
 )
 from app.utils.name import generate_random_string
 from app.utils.application_timezone import get_current_time
-from app.dao.schema import MilvusCollections, ProvisionerStatusEnum, KnowledgeBase
+from app.dao.schema import (
+    MilvusCollections,
+    ProvisionerStatusEnum,
+    KnowledgeBase,
+    SearchMethodEnum,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,14 +29,16 @@ class ProvisionManager:
     def __init__(self, milvusOps: MilvusOps, settings: Settings):
         self.milvusOps = milvusOps
         self.settings = settings
-        self.minPoolSize = MIN_POOL_SIZE
-        self.maxPoolSize = MAX_POOL_SIZE
+        self.flat_pool = POOL_FLAT
+        self.hnsw_pool = POOL_HNSW
+        self.ivf_pool = POOL_IVF_SQ8
+        self.total_pool = TOTAL_POOL_SIZE
         self.maxProvisioner = MAX_CONCURRENT_PROVISIONER
 
         self._reconcile_trigger_queue = asyncio.Queue()
         self._cleanup_trigger_queue = asyncio.Queue()
 
-    async def provision_new_collection(self):
+    async def provision_new_collection(self, search_method: SearchMethodEnum):
         collection_name = f"_{generate_random_string()}"
         collection_record_id = None
         try:
@@ -38,6 +47,7 @@ class ProvisionManager:
                     new_collection = MilvusCollections(
                         collection_name=collection_name,
                         status=ProvisionerStatusEnum.PROVISIONING,
+                        search_method=search_method,
                     )
                     db.add(new_collection)
                 await db.refresh(new_collection)
@@ -53,7 +63,9 @@ class ProvisionManager:
 
         try:
             await asyncio.to_thread(
-                self.milvusOps.create_collection, collection_name=collection_name
+                self.milvusOps.create_collection,
+                collection_name=collection_name,
+                collection_type=search_method,
             )
             logger.info(
                 f"successfully created collection '{collection_name}' in milvus"
@@ -102,12 +114,18 @@ class ProvisionManager:
                 func.sum(
                     case(
                         (
-                            MilvusCollections.status == ProvisionerStatusEnum.AVAILABLE,
+                            (
+                                MilvusCollections.status
+                                == ProvisionerStatusEnum.AVAILABLE
+                            )
+                            & (
+                                MilvusCollections.search_method == SearchMethodEnum.FLAT
+                            ),
                             1,
                         ),
                         else_=0,
                     )
-                ).label("available_count"),
+                ).label("flat_available_count"),
                 func.sum(
                     case(
                         (
@@ -115,37 +133,120 @@ class ProvisionManager:
                                 MilvusCollections.status
                                 == ProvisionerStatusEnum.PROVISIONING
                             )
-                            & (MilvusCollections.created_at >= time_threshold),
+                            & (MilvusCollections.created_at >= time_threshold)
+                            & (
+                                MilvusCollections.search_method == SearchMethodEnum.FLAT
+                            ),
                             1,
                         ),
                         else_=0,
                     )
-                ).label("provisioning_count"),
+                ).label("flat_provisioning_count"),
+                func.sum(
+                    case(
+                        (
+                            (
+                                MilvusCollections.status
+                                == ProvisionerStatusEnum.AVAILABLE
+                            )
+                            & (
+                                MilvusCollections.search_method == SearchMethodEnum.HNSW
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("hnsw_available_count"),
+                func.sum(
+                    case(
+                        (
+                            (
+                                MilvusCollections.status
+                                == ProvisionerStatusEnum.PROVISIONING
+                            )
+                            & (MilvusCollections.created_at >= time_threshold)
+                            & (
+                                MilvusCollections.search_method == SearchMethodEnum.HNSW
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("hnsw_provisioning_count"),
+                func.sum(
+                    case(
+                        (
+                            (
+                                MilvusCollections.status
+                                == ProvisionerStatusEnum.AVAILABLE
+                            )
+                            & (
+                                MilvusCollections.search_method
+                                == SearchMethodEnum.IVF_SQ8
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("ivf_available_count"),
+                func.sum(
+                    case(
+                        (
+                            (
+                                MilvusCollections.status
+                                == ProvisionerStatusEnum.PROVISIONING
+                            )
+                            & (MilvusCollections.created_at >= time_threshold)
+                            & (
+                                MilvusCollections.search_method
+                                == SearchMethodEnum.IVF_SQ8
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("ivf_provisioning_count"),
             )
 
             counts = (await db.execute(stmt)).one()
 
-            available_count = counts.available_count or 0
-            provisioning_count = counts.provisioning_count or 0
+            flat_available_count = counts.flat_available_count or 0
+            flat_provisioning_count = counts.flat_provisioning_count or 0
+            hnsw_available_count = counts.hnsw_available_count or 0
+            hnsw_provisioning_count = counts.hnsw_provisioning_count or 0
+            ivf_available_count = counts.ivf_available_count or 0
+            ivf_provisioning_count = counts.ivf_provisioning_count or 0
 
-        total_count = available_count + provisioning_count
+        flat_count = flat_available_count + flat_provisioning_count
+        hnsw_count = hnsw_available_count + hnsw_provisioning_count
+        ivf_count = ivf_available_count + ivf_provisioning_count
 
-        if total_count >= self.minPoolSize:
-            return (available_count >= self.minPoolSize, False)
+        flat_needed = None
+        hnsw_needed = None
+        ivf_needed = None
 
-        needed = self.minPoolSize - total_count
+        if flat_count >= self.flat_pool:
+            flat_needed = 0
+        else:
+            flat_needed = self.flat_pool - flat_count
 
-        logger.info(
-            f"available index={available_count}, provisioning={provisioning_count}, need to create={needed}"
-        )
+        if hnsw_count >= self.hnsw_pool:
+            hnsw_needed = 0
+        else:
+            hnsw_needed = self.hnsw_pool - hnsw_count
+
+        if ivf_count >= self.ivf_pool:
+            ivf_needed = 0
+        else:
+            ivf_needed = self.ivf_pool - ivf_count
 
         semaphore = asyncio.Semaphore(self.maxProvisioner)
 
-        async def provision_with_limit():
+        async def provision_with_limit(search_method: SearchMethodEnum):
             async with semaphore:
                 logger.info("dispatching index provisioner task")
                 try:
-                    await self.provision_new_collection()
+                    await self.provision_new_collection(search_method=search_method)
                     logger.info("successfully provisioned index")
                 except Exception as e:
                     logger.error(f"failed to provision new index: {e}", exc_info=True)
@@ -154,8 +255,20 @@ class ProvisionManager:
         exceptions = None
         try:
             async with asyncio.TaskGroup() as tg:
-                for i in range(needed):
-                    tg.create_task(provision_with_limit())
+                for i in range(flat_needed):
+                    tg.create_task(
+                        provision_with_limit(search_method=SearchMethodEnum.FLAT)
+                    )
+
+                for i in range(hnsw_needed):
+                    tg.create_task(
+                        provision_with_limit(search_method=SearchMethodEnum.HNSW)
+                    )
+
+                for i in range(ivf_needed):
+                    tg.create_task(
+                        provision_with_limit(search_method=SearchMethodEnum.IVF_SQ8)
+                    )
         except* Exception as eg:
             error_msg = (
                 f"reconcilation failed during provision of indexes: {eg.exceptions}"
