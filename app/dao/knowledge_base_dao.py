@@ -32,7 +32,10 @@ async def create_kb_db(*, db: AsyncSession, kb: CreateKbInDb) -> KnowledgeBase:
         async with db.begin():
             stmt = (
                 select(MilvusCollections)
-                .where(MilvusCollections.status == ProvisionerStatusEnum.AVAILABLE)
+                .where(
+                    MilvusCollections.search_method == kb.type,
+                    MilvusCollections.status == ProvisionerStatusEnum.AVAILABLE,
+                )
                 .order_by(func.random())
                 .limit(1)
                 .with_for_update(skip_locked=True)

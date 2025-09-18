@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.constants.content_type import ALLOWED_EXTENSIONS
+from app.dao.schema import SearchMethodEnum
 from app.dao.schema import ClientRoleEnum
 
 
@@ -145,15 +146,21 @@ class CreateKbInDb(BaseModel):
     user_id: int
     name: str
     category: str
+    type: SearchMethodEnum
 
 
 class CreateKbReq(BaseModel):
     name: str = Field(..., min_length=5, max_length=50)
     category: str = Field(..., min_length=3, max_length=50)
+    type: SearchMethodEnum
 
     class Config:
         json_schema_extra = {
-            "example": {"name": "dummy-knowledge-base", "category": "dummy-category"}
+            "example": {
+                "name": "dummy-knowledge-base",
+                "category": "dummy-category",
+                "type": "dummy-type",
+            }
         }
 
 

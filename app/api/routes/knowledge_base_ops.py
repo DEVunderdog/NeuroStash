@@ -38,7 +38,10 @@ async def create_knowledge_base(
 ):
     try:
         args = CreateKbInDb(
-            user_id=token_payload.user_id, name=req.name, category=req.category
+            user_id=token_payload.user_id,
+            name=req.name,
+            category=req.category,
+            type=req.type,
         )
         created_kb = await create_kb_db(db=db, kb=args)
         provisioner.trigger_reconcilation()
@@ -130,11 +133,11 @@ async def delete_kb(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="cannot find knowledge base to delete",
             )
-        
+
     except NoResultFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="cannot find the knowledge base to delete"
+            detail="cannot find the knowledge base to delete",
         )
     except HTTPException:
         raise
