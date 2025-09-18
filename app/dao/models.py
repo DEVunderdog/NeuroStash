@@ -260,11 +260,12 @@ class ListKbDocs(StandardResponse):
 
 
 class PoolStats(StandardResponse):
-    available: int
-    assigned: int
-    failed: int
-    cleanup: int
-    remote_collections: int
+    flat_available_count: int
+    flat_provisioning_count: int
+    hnsw_available_count: int
+    hnsw_provisioning_count: int
+    ivf_available_count: int
+    ivf_provisioning_count: int
 
 
 class SearchRequest(BaseModel):
