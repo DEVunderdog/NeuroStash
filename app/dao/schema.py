@@ -158,6 +158,9 @@ class DocumentRegistry(Base, TimestampMixin):
     knowledge_base_associations: Mapped[List["KnowledgeBaseDocument"]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
     )
+    parent_chunk_docs: Mapped[List["ParentChunkedDoc"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("user_id", "file_name", name="idx_unique_filename"),
@@ -304,4 +307,22 @@ class SearchingBatchJobs(Base, TimestampMixin):
     )
 
     def __repr__(self):
-        return f"<SearchingBatchJOb(id='{self.id}', user_id='{self.user_id}', op_status='{self.op_status}')"
+        return f"<SearchingBatchJob(id='{self.id}', user_id='{self.user_id}', op_status='{self.op_status}')"
+
+
+class ParentChunkedDoc(Base, TimestampMixin):
+    __tablename__ = "parent_chunked_docs"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents_registry.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+    chunk: Mapped[str] = mapped_column(Text, nullable=False)
+
+    document: Mapped["DocumentRegistry"] = relationship(
+        back_populates="parent_chunked_docs"
+    )
+
+    def __repr__(self) -> str:
+        return f"<ParentChunkedDoc(parent_doc_id={self.id}, doc_id={self.document_id})>"

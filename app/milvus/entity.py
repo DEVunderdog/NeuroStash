@@ -18,6 +18,7 @@ class CollectionSchemaEntity:
     text_content: str
     user_id: int
     file_id: int
+    parent_id: int
     text_sparse_vector: Optional[Dict[int, float]] = None
 
 

@@ -117,6 +117,11 @@ class MilvusOps:
                 datatype=DataType.INT64,
                 nullable=False,
             )
+            schema.add_field(
+                field_name="parent_id",
+                datatype=DataType.INT64,
+                nullable=False,
+            )
 
             bm25_function = Function(
                 name="text_bm25_emb",
@@ -153,7 +158,7 @@ class MilvusOps:
                     metric_type="COSINE",
                     params={"nlist": 128},
                 )
-            
+
             index_params.add_index(
                 field_name="text_sparse_vector",
                 index_name="text_sparse_index",
@@ -172,6 +177,12 @@ class MilvusOps:
 
             index_params.add_index(
                 field_name="file_id", index_type="INVERTED", index_name="file_index"
+            )
+
+            index_params.add_index(
+                field_name="parent_id",
+                index_type="INVERTED",
+                index_name="parent_doc_index",
             )
 
             index_params.add_index(

@@ -2,17 +2,14 @@ import asyncio
 import logging
 from typing import List, Tuple
 
-from langchain_openai import OpenAIEmbeddings
 from sqlalchemy import case, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.aws.client import AwsClientManager
-from app.constants.models import OPENAI_EMBEDDINGS_MODEL
 from app.core.config import Settings
 from app.dao.models import FileForIngestion, ReceivedSqsMessage
 from app.dao.schema import IngestionJob, KnowledgeBaseDocument, OperationStatusEnum
 from app.milvus.client import MilvusOps
 from app.processor.ingest_data import IngestData
-from app.processor.semantic_chunker import CustomSemanticChunker
 from app.core.db import SessionLocal
 
 
@@ -21,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class InvalidFileExtension(Exception):
     pass
+
 
 class ProcessorManager:
     def __init__(
@@ -31,16 +29,9 @@ class ProcessorManager:
     ):
         self.aws_client_manager: AwsClientManager = aws_client_manager
         self.settings: Settings = settings
-        self.embeddings = OpenAIEmbeddings(
-            model=OPENAI_EMBEDDINGS_MODEL, api_key=settings.OPENAI_KEY
-        )
-        self.semantic_chunker: CustomSemanticChunker = CustomSemanticChunker(
-            embeddings=self.embeddings
-        )
         self.ingest_data_ops: IngestData = IngestData(
-            embeddings=self.embeddings,
+            settings=settings,
             aws_client_manager=self.aws_client_manager,
-            semantic_chunker=self.semantic_chunker,
             milvus_ops=milvus_ops,
         )
 

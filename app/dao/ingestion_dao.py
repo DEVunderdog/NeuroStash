@@ -1,6 +1,6 @@
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, update
+from sqlalchemy import select, insert, update, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
@@ -13,6 +13,7 @@ from app.dao.schema import (
     DocumentRegistry,
     KnowledgeBase,
     MilvusCollections,
+    ParentChunkedDoc,
 )
 from uuid import UUID
 from app.utils.application_timezone import get_current_time
@@ -154,6 +155,22 @@ async def create_ingestion_job(
             exc_info=True,
         )
         raise
+
+
+async def create_parent_chunk(
+    *, db: AsyncSession, document_id: int, chunk: str
+) -> ParentChunkedDoc:
+    parent_doc = ParentChunkedDoc(
+        document_id=document_id,
+        chunk=chunk,
+    )
+    return parent_doc
+
+
+async def delete_parent_chunk(*, db: AsyncSession, document_id: int):
+    await db.execute(
+        delete(ParentChunkedDoc).where(ParentChunkedDoc.document_id == document_id)
+    )
 
 
 async def get_ingestion_job_status(
