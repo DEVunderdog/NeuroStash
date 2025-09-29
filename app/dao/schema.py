@@ -321,7 +321,7 @@ class ParentChunkedDoc(Base, TimestampMixin):
     chunk: Mapped[str] = mapped_column(Text, nullable=False)
 
     document: Mapped["DocumentRegistry"] = relationship(
-        back_populates="parent_chunked_docs"
+        back_populates="parent_chunk_docs"
     )
 
     def __repr__(self) -> str:

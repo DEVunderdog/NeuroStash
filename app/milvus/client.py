@@ -294,6 +294,7 @@ class MilvusOps:
                     "text_content",
                     "file_id",
                     "user_id",
+                    "parent_id"
                 ],
             )
 

@@ -255,13 +255,12 @@ class IngestData:
         try:
             chunked_docs = await self._process_file(file=file)
 
-            logger.info(f"\nlength of chunked_doc: {len(chunked_docs)}")
-
             data_for_milvus: List[CollectionSchemaEntity] = []
             parent_doc_objects: List[ParentChunkedDoc] = []
 
             for chunked_doc in chunked_docs:
-                parent_doc_obj = create_parent_chunk(
+                parent_doc_obj = await create_parent_chunk(
+                    db=db,
                     document_id=file.doc_id,
                     chunk=chunked_doc["parent_doc"].page_content,
                 )
@@ -314,7 +313,6 @@ class IngestData:
             )
             await delete_parent_chunk(db=db, document_id=file.doc_id)
             await db.commit()
-
         except Exception as e:
             logger.error(
                 f"error deleting entities record in milvus: {e}", exc_info=True

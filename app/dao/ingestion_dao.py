@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List
+from typing import List, Dict, Any
 from datetime import timedelta
 from app.dao.models import CreatedIngestionJob, FileForIngestion
 from app.dao.schema import (
@@ -19,7 +19,6 @@ from uuid import UUID
 from app.utils.application_timezone import get_current_time
 
 logger = logging.getLogger(__name__)
-
 
 class KnowledgeBaseNotFound(Exception):
     pass
@@ -202,3 +201,42 @@ async def cleanup_ingestion_job(*, db: AsyncSession):
 
     await db.execute(stmt)
     await db.commit()
+
+
+async def enhance_search_response(
+    *, db: AsyncSession, search_results: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    
+    print(f"\n\nsearch_results: {search_results}\n\n")
+
+    parent_ids = set()
+
+    for hits in search_results:
+        for hit in hits:
+            parent_id = getattr(hit.entity, "parent_id", None)
+            if parent_id is not None:
+                parent_ids.add(parent_id)
+
+    if not parent_ids:
+        return [hit.to_dict() for hits in search_results for hit in hits]
+
+    stmt = select(ParentChunkedDoc).where(ParentChunkedDoc.id.in_(parent_ids))
+    result = await db.execute(stmt)
+    parent_chunks = result.scalars().all()
+
+    chunk_map = {chunk.id: chunk.chunk for chunk in parent_chunks}
+
+    enhanced_response = []
+
+    for hits in search_results:
+        for hit in hits:
+            hit_dict = hit.to_dict()
+            entity = hit_dict.get("entity", {})
+            parent_id = entity.get("parent_id")
+
+            if parent_id in chunk_map:
+                entity["parent_chunk"] = chunk_map[parent_id]
+
+            enhanced_response.append(hit_dict)
+
+    return enhanced_response

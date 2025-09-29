@@ -275,4 +275,4 @@ class SearchRequest(BaseModel):
 
 
 class SearchResponse(StandardResponse):
-    response: List[List[dict]]
+    response: List[Dict[str, Any]]

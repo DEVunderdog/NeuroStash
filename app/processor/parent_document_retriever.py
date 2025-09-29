@@ -177,9 +177,9 @@ class ParentDocumentRetriever:
 
         return documents
 
-    def _split_documents(self, documents: Iterable[Document]) -> List[Document]:
+    def _split_documents(self, documents: Iterable[Document]) -> List[dict]:
 
-        splitted_data: List[dict] = [{}]
+        splitted_data: List[dict] = []
 
         texts, metadatas = [], []
         for doc in documents:

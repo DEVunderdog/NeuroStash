@@ -3,6 +3,7 @@ from fastapi import APIRouter, status, HTTPException
 from app.api.deps import SearchOpsDep, SessionDep, TokenPayloadDep
 from app.dao.models import SearchResponse, SearchRequest
 from app.dao.knowledge_base_dao import get_kb_collection, KnowledgeBaseNotFound
+from app.dao.ingestion_dao import enhance_search_response
 
 router = APIRouter(prefix="/search", tags=["document retrieval"])
 
@@ -38,8 +39,19 @@ async def search(
             limit=req.search_limit,
         )
 
+        if len(search_result) == 0:
+            return SearchResponse(
+                message="cannot find relevant search results", 
+                response=[]
+            )
+
+        enhanced_search_results = await enhance_search_response(
+            db=db, search_results=search_result
+        )
+
         return SearchResponse(
-            message="successfully fetch the search results", response=search_result
+            message="successfully fetch the search results",
+            response=enhanced_search_results,
         )
 
     except KnowledgeBaseNotFound as e:
