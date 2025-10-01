@@ -2,17 +2,8 @@
 
 set -euo pipefail
 
-VENV_DIR="venv"
-
-# Create venv if not exists
-if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv "$VENV_DIR"
-    "$VENV_DIR/bin/pip" install --upgrade pip
-    "$VENV_DIR/bin/pip" install -r requirements.txt
-fi
-
-# Activate venv
-source "$VENV_DIR/bin/activate"
+echo "=== Running database migration ==="
+alembic upgrade head
 
 echo "=== Starting initial operations ==="
 python -m app.initial_ops
@@ -23,4 +14,4 @@ python -m app.pre_start
 echo "=== Pre-start checks completed ==="
 
 echo "=== Launching the main application ==="
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level info
