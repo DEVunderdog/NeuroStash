@@ -9,6 +9,3 @@ stop:
 
 logs:
 	docker compose -f docker/docker-compose.yaml logs -f $(SERVICE)
-
-local:
-	./scripts/startup.sh
