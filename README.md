@@ -1,11 +1,11 @@
 # NeuroStash
 
 ## Design Videos
-- Please go through the videos I have explain the design problems that I have tried to solve, what I though while solving those problems.
-[Parent Document Retriever](https://www.youtube.com/watch?v=YlVMd3XD5V8)
-[File Management](https://www.youtube.com/watch?v=cJP3_MdRJ8s)
-[User Management](https://www.youtube.com/watch?v=iUO-YAGVFco)
-[Milvus and Knowledge base](https://www.youtube.com/watch?v=GP2KpScLB38)
+- Please go through the videos I have explain the design problems that I have tried to solve, what I though while solving those problems.  
+   - [Parent Document Retriever](https://www.youtube.com/watch?v=YlVMd3XD5V8)  
+   - [File Management](https://www.youtube.com/watch?v=cJP3_MdRJ8s)  
+   - [User Management](https://www.youtube.com/watch?v=iUO-YAGVFco)  
+   - [Milvus and Knowledge base](https://www.youtube.com/watch?v=GP2KpScLB38)  
 
 ## Introduction
 NeuroStash is an intelligent document management system that powers Large Language Models (LLMs) operations by providing document processing and semantic search capabilities. It's specifically designed for small to medium enterprises seeking a cost-effective, self-hosted alternative to expensive enterprise solutions.
