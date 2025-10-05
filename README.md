@@ -1,7 +1,7 @@
 # NeuroStash
 
 ## Design Videos
-- Please go through the videos I have explain the design problems that I have tried to solve, what I though while solving those problems.  
+- Please go through the videos I have explain the design problems that I have tried to solve, what was my thinking process while solving those problems.  
    - [Parent Document Retriever](https://www.youtube.com/watch?v=YlVMd3XD5V8)  
    - [File Management](https://www.youtube.com/watch?v=cJP3_MdRJ8s)  
    - [User Management](https://www.youtube.com/watch?v=iUO-YAGVFco)  
